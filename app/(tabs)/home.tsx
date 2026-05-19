@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Pressable,
   ScrollView, TextInput, Dimensions,
@@ -19,6 +19,7 @@ import { useFavourites } from '../../hooks/useFavourites';
 
 const { width: SW } = Dimensions.get('window');
 
+
 const BANNERS = [
   { id: '1', emoji: '🥦', title: 'Fresh\nVegetables', subtitle: 'Farm to table daily', bg: '#E8F5E9' },
   { id: '2', emoji: '🍅', title: 'Rythu\nBazar Rates', subtitle: 'Updated every morning', bg: '#FFF3E0' },
@@ -27,13 +28,26 @@ const BANNERS = [
 
 function BannerCarousel() {
   const [active, setActive] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActive(prev => {
+        const next = (prev + 1) % BANNERS.length;
+        scrollRef.current?.scrollTo({ x: next * (SW - Spacing.lg * 2), animated: true });
+        return next;
+      });
+    }, 3500);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <View style={bannerStyles.wrap}>
       <ScrollView
+        ref={scrollRef}
         horizontal pagingEnabled showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={e => {
-          setActive(Math.round(e.nativeEvent.contentOffset.x / (SW - Spacing.xxl * 2)));
+          setActive(Math.round(e.nativeEvent.contentOffset.x / (SW - Spacing.lg * 2)));
         }}
       >
         {BANNERS.map(b => (
@@ -56,9 +70,9 @@ function BannerCarousel() {
 }
 
 const bannerStyles = StyleSheet.create({
-  wrap: { marginHorizontal: Spacing.xxl, borderRadius: Radius.lg, overflow: 'hidden', marginBottom: Spacing.xl },
+  wrap: { marginHorizontal: Spacing.lg, borderRadius: Radius.lg, overflow: 'hidden', marginBottom: Spacing.xl },
   slide: {
-    width: SW - Spacing.xxl * 2,
+    width: SW - Spacing.lg * 2,
     height: 120,
     flexDirection: 'row',
     alignItems: 'center',
@@ -84,7 +98,7 @@ function SectionHeader({ title, onSeeAll }: { title: string; onSeeAll?: () => vo
 }
 
 const sh = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: Spacing.xxl, marginBottom: Spacing.md },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: Spacing.lg, marginBottom: Spacing.md },
   title: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary, letterSpacing: -0.3 },
   seeAll: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary },
 });
@@ -92,10 +106,18 @@ const sh = StyleSheet.create({
 export default function HomeScreen() {
   const { addItem } = useCart();
   const { ids, toggle } = useFavourites();
+  const [query, setQuery] = useState('');
+  const unreadCount = 3;
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
-  const topRates = marketRates.slice(0, 5);
+  const q = query.trim().toLowerCase();
+  const topRates = q
+    ? marketRates.filter(r => r.name.toLowerCase().includes(q) || r.te.toLowerCase().includes(q))
+    : marketRates.slice(0, 5);
   const favRates = marketRates.filter(r => ids.includes(r.id)).slice(0, 3);
+  const shopProducts = q
+    ? products.filter(p => p.name.toLowerCase().includes(q) || p.te.toLowerCase().includes(q))
+    : products.slice(0, 4);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -104,13 +126,20 @@ export default function HomeScreen() {
       {/* Green Header */}
       <View style={styles.header}>
         <View style={styles.headerRow1}>
-          <View style={styles.locationRow}>
-            <Ionicons name="location-sharp" size={14} color={Colors.textInverse} />
-            <Text style={styles.locationText}>Vizag, Gajuwaka..</Text>
+          <View style={styles.locationCol}>
+            <View style={styles.locationRow}>
+              <Ionicons name="location-sharp" size={13} color={Colors.textInverse} />
+              <Text style={styles.locationBrand}>Vizag Vegetables</Text>
+            </View>
+            <Text style={styles.locationSub}>Gajuwaka, Nehru nagaru,....</Text>
           </View>
-          <Pressable style={styles.bellBtn}>
-            <Ionicons name="notifications-outline" size={20} color={Colors.textInverse} />
-            <View style={styles.bellDot} />
+          <Pressable style={styles.bellBtn} onPress={() => router.push('/notifications' as any)}>
+            <Ionicons name="notifications-outline" size={22} color={Colors.textInverse} />
+            {unreadCount > 0 && (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unreadCount}</Text>
+              </View>
+            )}
           </Pressable>
         </View>
         <View style={styles.headerRow2}>
@@ -118,13 +147,21 @@ export default function HomeScreen() {
           <Text style={styles.date}>{today}</Text>
         </View>
         <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={16} color={Colors.textMuted} />
+          <Ionicons name="search" size={16} color={Colors.textMuted} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search vegetables, fruits..."
+            placeholder="Search for vegetables, fruits..."
             placeholderTextColor={Colors.textMuted}
-            editable={false}
+            value={query}
+            onChangeText={setQuery}
+            underlineColorAndroid="transparent"
+            returnKeyType="search"
           />
+          {query.length > 0 && (
+            <Pressable onPress={() => setQuery('')}>
+              <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
+            </Pressable>
+          )}
         </View>
       </View>
 
@@ -140,7 +177,7 @@ export default function HomeScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           keyExtractor={i => i.id}
-          contentContainerStyle={{ paddingHorizontal: Spacing.xxl, gap: Spacing.md, paddingBottom: Spacing.sm }}
+          contentContainerStyle={{ paddingHorizontal: Spacing.lg, gap: Spacing.md, paddingBottom: Spacing.sm }}
           renderItem={({ item }) => (
             <Pressable
               style={rateCard.card}
@@ -153,7 +190,9 @@ export default function HomeScreen() {
                   color={ids.includes(item.id) ? Colors.danger : Colors.textMuted}
                 />
               </Pressable>
-              <Text style={rateCard.emoji}>{item.emoji}</Text>
+              <View style={rateCard.emojiCircle}>
+                <Text style={rateCard.emoji}>{item.emoji}</Text>
+              </View>
               <Text style={rateCard.name}>{item.name}</Text>
               <Text style={rateCard.te}>{item.te}</Text>
               <View style={rateCard.priceRow}>
@@ -170,18 +209,22 @@ export default function HomeScreen() {
         {favRates.length === 0 ? (
           <Text style={styles.emptyFav}>Tap ♡ on any rate card to add favourites</Text>
         ) : (
-          <View style={favStyles.card}>
-            {favRates.map((r, i) => (
-              <View key={r.id}>
+          <View style={favStyles.list}>
+            {favRates.map((r) => (
+              <View key={r.id} style={favStyles.card}>
                 <View style={favStyles.row}>
-                  <Text style={favStyles.emoji}>{r.emoji}</Text>
+                  <View style={favStyles.emojiCircle}>
+                    <Text style={favStyles.emoji}>{r.emoji}</Text>
+                  </View>
                   <View style={{ flex: 1 }}>
                     <Text style={favStyles.name}>{r.name}</Text>
                     <Text style={favStyles.te}>{r.te}</Text>
                   </View>
-                  <Text style={favStyles.price}>₹{r.today}/{r.unit}</Text>
+                  <View style={favStyles.priceWrap}>
+                    <Text style={favStyles.price}>₹{r.today}/{r.unit}</Text>
+                    <Badge chg={r.chg} />
+                  </View>
                 </View>
-                {i < favRates.length - 1 && <View style={favStyles.divider} />}
               </View>
             ))}
           </View>
@@ -191,25 +234,33 @@ export default function HomeScreen() {
         <View style={{ height: Spacing.xl }} />
         <SectionHeader title="🛒  Shopping List" onSeeAll={() => router.push('/(tabs)/shop' as any)} />
         <FlatList
-          data={products.slice(0, 4)}
+          data={shopProducts}
           numColumns={2}
           scrollEnabled={false}
           keyExtractor={i => i.id}
-          columnWrapperStyle={{ gap: Spacing.md, paddingHorizontal: Spacing.xxl }}
+          columnWrapperStyle={{ gap: Spacing.md, paddingHorizontal: Spacing.lg }}
           contentContainerStyle={{ gap: Spacing.md }}
           renderItem={({ item }) => (
             <Pressable style={prodCard.card} onPress={() => router.push('/shop-details' as any)}>
-              <Text style={prodCard.emoji}>{item.emoji}</Text>
-              <Text style={prodCard.name}>{item.name}</Text>
-              <Text style={prodCard.weight}>{item.weight}</Text>
-              <View style={prodCard.footer}>
-                <Text style={prodCard.price}>₹{item.price}</Text>
-                <Pressable
-                  style={prodCard.addBtn}
-                  onPress={() => addItem({ id: item.id, name: item.name, te: item.te, emoji: item.emoji, price: item.price, weight: item.weight, quantity: 1 })}
-                >
-                  <Text style={prodCard.addText}>Add</Text>
-                </Pressable>
+              <View style={prodCard.photoArea}>
+                <Text style={prodCard.emoji}>{item.emoji}</Text>
+              </View>
+              <View style={prodCard.info}>
+                <Text style={prodCard.name}>{item.name}</Text>
+                <Text style={prodCard.te}>{item.te}</Text>
+                <Text style={prodCard.weight}>{item.weight}</Text>
+                <View style={prodCard.footer}>
+                  <View style={prodCard.priceRow}>
+                    <Text style={prodCard.price}>₹{item.price}</Text>
+                    <Text style={prodCard.orig}>₹{item.orig}</Text>
+                  </View>
+                  <Pressable
+                    style={prodCard.addBtn}
+                    onPress={() => addItem({ id: item.id, name: item.name, te: item.te, emoji: item.emoji, price: item.price, weight: item.weight, quantity: 1 })}
+                  >
+                    <Text style={prodCard.addText}>Add</Text>
+                  </Pressable>
+                </View>
               </View>
             </Pressable>
           )}
@@ -220,7 +271,7 @@ export default function HomeScreen() {
         <SectionHeader title="Today's Price Table" onSeeAll={() => router.push('/(tabs)/price' as any)} />
         <View style={tableStyles.card}>
           <View style={tableStyles.headerRow}>
-            <Text style={[tableStyles.col, { flex: 2 }]}>Item</Text>
+            <Text style={[tableStyles.col, { flex: 2, textAlign: 'left' }]}>Item</Text>
             <Text style={tableStyles.col}>Today</Text>
             <Text style={tableStyles.col}>Prev</Text>
             <Text style={tableStyles.col}>Chg</Text>
@@ -233,7 +284,7 @@ export default function HomeScreen() {
               </View>
               <Text style={tableStyles.today}>₹{r.today}</Text>
               <Text style={tableStyles.prev}>₹{r.prev}</Text>
-              <Badge chg={r.chg} />
+              <View style={tableStyles.chgCell}><Badge chg={r.chg} /></View>
             </View>
           ))}
         </View>
@@ -245,7 +296,8 @@ export default function HomeScreen() {
 const rateCard = StyleSheet.create({
   card: { width: 120, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, ...Shadow.sm },
   heart: { alignSelf: 'flex-end', marginBottom: Spacing.xs },
-  emoji: { fontSize: 36, marginBottom: Spacing.xs },
+  emojiCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: Spacing.sm },
+  emoji: { fontSize: 30 },
   name: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
   te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.xs },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
@@ -253,28 +305,35 @@ const rateCard = StyleSheet.create({
 });
 
 const favStyles = StyleSheet.create({
-  card: { marginHorizontal: Spacing.xxl, backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm },
+  list: { marginHorizontal: Spacing.lg, gap: Spacing.sm },
+  card: { backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm },
   row: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, gap: Spacing.md },
-  emoji: { fontSize: 28 },
+  emojiCircle: { width: 42, height: 42, borderRadius: 21, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center' },
+  emoji: { fontSize: 22 },
   name: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
   te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted },
+  priceWrap: { alignItems: 'flex-end', gap: 4 },
   price: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginHorizontal: Spacing.md },
 });
 
 const prodCard = StyleSheet.create({
-  card: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, ...Shadow.sm },
-  emoji: { fontSize: 40, marginBottom: Spacing.xs },
-  name: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
+  card: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm },
+  photoArea: { height: 120, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center' },
+  emoji: { fontSize: 50 },
+  info: { padding: Spacing.md },
+  name: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary, marginBottom: 2 },
+  te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: 2 },
   weight: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.sm },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
   price: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary },
-  addBtn: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
+  orig: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, textDecorationLine: 'line-through' },
+  addBtn: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
   addText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textInverse },
 });
 
 const tableStyles = StyleSheet.create({
-  card: { marginHorizontal: Spacing.xxl, backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm, marginBottom: Spacing.xxl },
+  card: { marginHorizontal: Spacing.lg, backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm, marginBottom: Spacing.xxl },
   headerRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primaryPale, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
   col: { flex: 1, fontFamily: FontFamily.semiBold, fontSize: FontSize.xs, color: Colors.primary, textAlign: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
@@ -283,20 +342,24 @@ const tableStyles = StyleSheet.create({
   itemName: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textPrimary },
   today: { flex: 1, fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary, textAlign: 'center' },
   prev: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center' },
+  chgCell: { flex: 1, alignItems: 'center' },
 });
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.xxl, paddingBottom: Spacing.lg },
+  header: { backgroundColor: Colors.primaryDark, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg, paddingTop: Spacing.sm },
   headerRow1: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.xs },
+  locationCol: { flexDirection: 'column', gap: 2 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  locationText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textInverse },
-  bellBtn: { position: 'relative' },
-  bellDot: { position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.danger },
-  headerRow2: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md },
-  greeting: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: Colors.textInverse, letterSpacing: -0.3 },
+  locationBrand: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textInverse },
+  locationSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)', paddingLeft: 17 },
+  bellBtn: { position: 'relative', width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.18)', alignItems: 'center', justifyContent: 'center' },
+  bellBadge: { position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: Colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  bellBadgeText: { fontFamily: FontFamily.bold, fontSize: 9, color: Colors.textInverse },
+  headerRow2: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md, marginTop: Spacing.xs },
+  greeting: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textInverse, letterSpacing: -0.3 },
   date: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.8)' },
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.full, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, gap: Spacing.sm },
-  searchInput: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textPrimary, padding: 0 },
-  emptyFav: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center', marginHorizontal: Spacing.xxl, marginBottom: Spacing.md },
+  searchInput: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textPrimary, padding: 0, outlineStyle: 'none' } as any,
+  emptyFav: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center', marginHorizontal: Spacing.lg, marginBottom: Spacing.md },
 });

@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   radioActive: { borderColor: Colors.primary },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary },
   upiInput: { marginTop: Spacing.xs, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, backgroundColor: Colors.surface },
-  upiField: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textPrimary },
+  upiField: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textPrimary, outlineStyle: 'none' } as any,
   summaryCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, gap: Spacing.sm, ...Shadow.sm, borderWidth: 1, borderColor: Colors.border },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
   summaryKey: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary },

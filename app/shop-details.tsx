@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Dimensions, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,7 +11,7 @@ import { Spacing, Radius, Shadow } from '../constants/spacing';
 import { products } from '../dummy-data/products';
 import { useCart, useItemQuantity } from '../hooks/useCart';
 
-const { width: SW } = Dimensions.get('window');
+Dimensions.get('window');
 const WEIGHTS = ['1kg', '5kg', '10kg'];
 
 export default function ShopDetails() {
@@ -20,6 +20,14 @@ export default function ShopDetails() {
   const [selectedWeight, setSelectedWeight] = useState(WEIGHTS[0]);
   const { addItem, increase, decrease } = useCart();
   const qty = useItemQuantity(product.id);
+
+  const handleShare = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await Share.share({
+      title: product.name,
+      message: `🛒 ${product.name} — ₹${product.price}/${product.weight}\n${product.description}\n\nOrder fresh from Vizag Vegetables!`,
+    });
+  };
 
   const handleAddToCart = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -38,7 +46,7 @@ export default function ShopDetails() {
         <Pressable style={[styles.iconBtn, { left: Spacing.lg }]} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={20} color={Colors.textPrimary} />
         </Pressable>
-        <Pressable style={[styles.iconBtn, { right: Spacing.lg }]}>
+        <Pressable style={[styles.iconBtn, { right: Spacing.lg }]} onPress={handleShare}>
           <Ionicons name="share-outline" size={20} color={Colors.textPrimary} />
         </Pressable>
         <View style={styles.dotsRow}>
@@ -99,11 +107,13 @@ export default function ShopDetails() {
       <View style={styles.bottomBar}>
         {qty > 0 ? (
           <View style={styles.stepper}>
-            <Pressable style={styles.stepBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); decrease(product.id); }}>
+            <Pressable style={styles.stepCircleBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); decrease(product.id); }}>
               <Text style={styles.stepIcon}>−</Text>
             </Pressable>
-            <Text style={styles.stepQty}>{qty}</Text>
-            <Pressable style={styles.stepBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); increase(product.id); }}>
+            <View style={styles.stepQtyBox}>
+              <Text style={styles.stepQty}>{qty}</Text>
+            </View>
+            <Pressable style={styles.stepCircleBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); increase(product.id); }}>
               <Text style={styles.stepIcon}>+</Text>
             </Pressable>
           </View>
@@ -137,7 +147,7 @@ const styles = StyleSheet.create({
   sectionLabel: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.sm },
   weightRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl },
   weightChip: { borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.sm, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm },
-  weightChipActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
+  weightChipActive: { borderColor: Colors.primary, backgroundColor: Colors.surface },
   weightText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
   weightTextActive: { color: Colors.primary },
   divider: { height: 1, backgroundColor: Colors.border, marginBottom: Spacing.xl },
@@ -146,10 +156,11 @@ const styles = StyleSheet.create({
   tag: { backgroundColor: Colors.primaryPale, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
   tagText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.primary },
   bottomBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.xxl, paddingVertical: Spacing.lg, backgroundColor: Colors.surface, borderTopWidth: 1, borderTopColor: Colors.border, gap: Spacing.md },
-  stepper: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
-  stepBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  stepIcon: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: Colors.primary },
-  stepQty: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary, minWidth: 24, textAlign: 'center' },
+  stepper: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  stepCircleBtn: { width: 36, height: 36, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
+  stepQtyBox: { width: 40, height: 36, borderRadius: Radius.sm, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  stepIcon: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.primary },
+  stepQty: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
   addToCartBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: Radius.full, paddingVertical: Spacing.lg, alignItems: 'center' },
   addToCartText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.md, color: Colors.textInverse },
 });

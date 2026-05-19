@@ -1,12 +1,6 @@
 import { useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  FadeInDown,
-} from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -16,17 +10,17 @@ import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius } from '../../constants/spacing';
 
 export default function GetStarted() {
-  const translateY = useSharedValue(40);
   const opacity = useSharedValue(0);
+  const translateY = useSharedValue(30);
 
   useEffect(() => {
-    translateY.value = withSpring(0, { damping: 14 });
     opacity.value = withTiming(1, { duration: 500 });
+    translateY.value = withSpring(0, { damping: 14 });
   }, []);
 
-  const contentStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
+  const animStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
   }));
 
   const handleGetStarted = () => {
@@ -38,35 +32,33 @@ export default function GetStarted() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
 
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.brandTitle}>Vizag Vegetables 🥕</Text>
+        <Text style={styles.brandTitle}>Vizag Vegetables</Text>
+        <Text style={styles.brandIcon}>🥕</Text>
       </View>
 
-      <Animated.View style={[styles.illustrationWrap, contentStyle]}>
-        <View style={styles.illustrationPlaceholder}>
-          <Text style={styles.illustrationEmoji}>🥦🥕🍅🧅🌽</Text>
-          <Text style={styles.illustrationSub}>Fresh from Rythu Bazar</Text>
-        </View>
-      </Animated.View>
+      {/* Illustration area */}
+      <View style={styles.illustrationArea}>
+        <Text style={styles.illustrationEmoji}>🧑‍🛒👩‍🛒</Text>
+      </View>
 
-      <Animated.View style={[styles.bottom, contentStyle]}>
+      {/* Tagline + CTA — still on green background */}
+      <Animated.View style={[styles.bottom, animStyle]}>
         <Text style={styles.tagline}>
           Vizag Vegetables is a solution for{' '}
           <Text style={styles.taglineBold}>Grocery Shopping</Text>
           {' '}every you need
         </Text>
 
-        <Pressable
-          style={styles.button}
-          onPress={handleGetStarted}
-        >
+        <Pressable style={styles.button} onPress={handleGetStarted}>
           <Text style={styles.buttonText}>Get Started</Text>
         </Pressable>
 
         <View style={styles.dotsRow}>
-          {[0, 1, 2].map(i => (
-            <View key={i} style={[styles.dot, i === 2 && styles.dotActive]} />
-          ))}
+          <View style={styles.dot} />
+          <View style={styles.dot} />
+          <View style={[styles.dot, styles.dotActive]} />
         </View>
       </Animated.View>
     </SafeAreaView>
@@ -79,48 +71,42 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.xxl,
     paddingTop: Spacing.lg,
-    paddingBottom: Spacing.xl,
+    paddingBottom: Spacing.sm,
+    gap: Spacing.sm,
   },
   brandTitle: {
     fontFamily: FontFamily.bold,
-    fontSize: FontSize.xxl,
+    fontSize: FontSize.xl,
     color: Colors.textInverse,
-    letterSpacing: -0.3,
   },
-  illustrationWrap: {
+  brandIcon: {
+    fontSize: 24,
+  },
+  illustrationArea: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.xxl,
-  },
-  illustrationPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   illustrationEmoji: {
-    fontSize: 72,
-    letterSpacing: 4,
-    marginBottom: Spacing.md,
-  },
-  illustrationSub: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.md,
-    color: 'rgba(255,255,255,0.7)',
+    fontSize: 110,
+    letterSpacing: 8,
   },
   bottom: {
     paddingHorizontal: Spacing.xxl,
-    paddingBottom: Spacing.xxxl,
+    paddingBottom: 40,
     alignItems: 'center',
+    gap: Spacing.xl,
   },
   tagline: {
     fontFamily: FontFamily.regular,
-    fontSize: FontSize.lg,
+    fontSize: FontSize.md,
     color: Colors.textInverse,
     textAlign: 'center',
-    marginBottom: Spacing.xxl,
-    lineHeight: FontSize.lg * 1.5,
+    lineHeight: FontSize.md * 1.65,
   },
   taglineBold: {
     fontFamily: FontFamily.bold,
@@ -128,12 +114,10 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.full,
+    borderRadius: Radius.xl,
     paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.xxxl,
     width: '100%',
     alignItems: 'center',
-    marginBottom: Spacing.xxl,
   },
   buttonText: {
     fontFamily: FontFamily.semiBold,
@@ -142,16 +126,16 @@ const styles = StyleSheet.create({
   },
   dotsRow: {
     flexDirection: 'row',
-    gap: Spacing.sm,
+    gap: 8,
+    alignItems: 'center',
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: Radius.full,
-    backgroundColor: 'rgba(255,255,255,0.4)',
+    backgroundColor: 'rgba(255,255,255,0.35)',
   },
   dotActive: {
-    backgroundColor: Colors.textInverse,
-    width: 20,
+    backgroundColor: 'rgba(255,255,255,0.75)',
   },
 });

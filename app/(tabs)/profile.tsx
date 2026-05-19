@@ -86,11 +86,11 @@ export default function ProfileScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>MY ACCOUNT</Text>
           <View style={styles.sep} />
-          <SettingRow icon="receipt-outline" label="My Orders" badge={2} />
+          <SettingRow icon="receipt-outline" label="My Orders" badge={2} onPress={() => router.push('/my-orders' as any)} />
           <View style={styles.sep} />
-          <SettingRow icon="heart-outline" label="Saved Favourites" />
+          <SettingRow icon="heart-outline" label="Saved Favourites" onPress={() => router.push('/saved-favourites' as any)} />
           <View style={styles.sep} />
-          <SettingRow icon="location-outline" label="Addresses" />
+          <SettingRow icon="location-outline" label="Addresses" onPress={() => router.push('/addresses' as any)} />
         </View>
 
         {/* Notifications */}
@@ -108,9 +108,9 @@ export default function ProfileScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>MORE</Text>
           <View style={styles.sep} />
-          <SettingRow icon="headset-outline" label="Support" />
+          <SettingRow icon="headset-outline" label="Support" onPress={() => router.push('/support' as any)} />
           <View style={styles.sep} />
-          <SettingRow icon="information-circle-outline" label="About Us" />
+          <SettingRow icon="information-circle-outline" label="About Us" onPress={() => router.push('/about-us' as any)} />
         </View>
 
         {/* Logout */}

@@ -16,12 +16,12 @@ const CATEGORIES: { key: Category; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'vegetables', label: 'Vegetables' },
   { key: 'fruits', label: 'Fruits' },
-  { key: 'leafy', label: 'Leafy' },
   { key: 'flowers', label: 'Flowers' },
+  { key: 'leafy', label: 'Leafs' },
   { key: 'favourite', label: 'Favorite' },
 ];
 
-function PriceRowItem({ item }: { item: MarketRate }) {
+function PriceRowItem({ item, isFav, onToggleFav }: { item: MarketRate; isFav: boolean; onToggleFav: () => void }) {
   return (
     <View style={listStyles.row}>
       <View style={listStyles.itemCell}>
@@ -31,6 +31,9 @@ function PriceRowItem({ item }: { item: MarketRate }) {
       <Text style={listStyles.today}>₹{item.today}</Text>
       <Text style={listStyles.prev}>₹{item.prev}</Text>
       <View style={listStyles.chgCell}><Badge chg={item.chg} /></View>
+      <Pressable onPress={onToggleFav} style={listStyles.heartBtn}>
+        <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={16} color={isFav ? Colors.danger : Colors.textMuted} />
+      </Pressable>
     </View>
   );
 }
@@ -92,14 +95,14 @@ export default function PriceScreen() {
             <Ionicons name="search-outline" size={16} color={Colors.textMuted} />
             <TextInput
               style={styles.searchInput}
-              placeholder={`${marketRates.length} items  Search for vegetables, fruits...`}
+              placeholder={`${marketRates.length} items  Search vegetables, fruits, flowers...`}
               placeholderTextColor={Colors.textMuted}
               value={query}
               onChangeText={setQuery}
             />
           </View>
           <Pressable style={styles.toggleBtn} onPress={() => setIsGrid(g => !g)}>
-            <Ionicons name={isGrid ? 'list-outline' : 'grid-outline'} size={16} color={Colors.textPrimary} />
+            <Ionicons name={isGrid ? 'list-outline' : 'grid-outline'} size={16} color={Colors.primary} />
             <Text style={styles.toggleText}>{isGrid ? 'List' : 'Grid'}</Text>
           </Pressable>
         </View>
@@ -117,7 +120,8 @@ export default function PriceScreen() {
           data={filtered}
           numColumns={2}
           keyExtractor={i => i.id}
-          columnWrapperStyle={{ gap: Spacing.md, paddingHorizontal: Spacing.xxl }}
+          showsVerticalScrollIndicator={false}
+          columnWrapperStyle={{ gap: Spacing.md, paddingHorizontal: Spacing.lg }}
           contentContainerStyle={{ gap: Spacing.md, paddingTop: Spacing.md, paddingBottom: 100 }}
           renderItem={({ item }) => (
             <PriceGridItem item={item} isFav={ids.includes(item.id)} onToggleFav={() => toggle(item.id)} />
@@ -128,16 +132,18 @@ export default function PriceScreen() {
           key="list"
           data={filtered}
           keyExtractor={i => i.id}
-          contentContainerStyle={{ paddingHorizontal: Spacing.xxl, paddingTop: Spacing.md, paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingTop: Spacing.md, paddingBottom: 100 }}
           ListHeaderComponent={
             <View style={listStyles.header}>
               <Text style={[listStyles.headerCol, { flex: 2 }]}>Item</Text>
               <Text style={listStyles.headerCol}>Today</Text>
               <Text style={listStyles.headerCol}>Prev</Text>
               <Text style={listStyles.headerCol}>Chg</Text>
+              <View style={{ width: 28 }} />
             </View>
           }
-          renderItem={({ item }) => <PriceRowItem item={item} />}
+          renderItem={({ item }) => <PriceRowItem item={item} isFav={ids.includes(item.id)} onToggleFav={() => toggle(item.id)} />}
           ItemSeparatorComponent={() => <View style={listStyles.sep} />}
           style={listStyles.card}
         />
@@ -147,7 +153,7 @@ export default function PriceScreen() {
 }
 
 const listStyles = StyleSheet.create({
-  card: { marginHorizontal: Spacing.xxl, backgroundColor: Colors.surface, borderRadius: Radius.lg, ...Shadow.sm },
+  card: { marginHorizontal: Spacing.lg, backgroundColor: Colors.surface, borderRadius: Radius.lg, ...Shadow.sm },
   header: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primaryPale, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg },
   headerCol: { flex: 1, fontFamily: FontFamily.semiBold, fontSize: FontSize.xs, color: Colors.primary, textAlign: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, paddingVertical: Spacing.md },
@@ -157,6 +163,7 @@ const listStyles = StyleSheet.create({
   today: { flex: 1, fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary, textAlign: 'center' },
   prev: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center' },
   chgCell: { flex: 1, alignItems: 'center' },
+  heartBtn: { width: 28, alignItems: 'center' },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginHorizontal: Spacing.md },
 });
 
@@ -173,7 +180,7 @@ const gridStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.xxl, paddingBottom: Spacing.lg },
+  header: { backgroundColor: Colors.primaryDark, paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.lg, borderBottomLeftRadius: Radius.xl, borderBottomRightRadius: Radius.xl },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.md },
   title: { fontFamily: FontFamily.bold, fontSize: FontSize.xxl, color: Colors.textInverse, letterSpacing: -0.3 },
   telugu: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
@@ -181,8 +188,8 @@ const styles = StyleSheet.create({
   updated: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)' },
   searchRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
   searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: Spacing.sm },
-  searchInput: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textPrimary, padding: 0 },
+  searchInput: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textPrimary, padding: 0, outlineStyle: 'none' } as any,
   toggleBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: 4, ...Shadow.sm },
-  toggleText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textPrimary },
-  chipsRow: { maxHeight: 52, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  toggleText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.primary },
+  chipsRow: { maxHeight: 56, backgroundColor: Colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
 });

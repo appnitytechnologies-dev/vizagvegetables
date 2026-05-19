@@ -29,6 +29,11 @@ export const marketRates: MarketRate[] = [
   { id: '16', emoji: '🍇', name: 'Grapes',       te: 'ద్రాక్ష',       cat: 'fruits',     today: 90,  prev: 80,  chg: +10, unit: 'kg' },
   { id: '17', emoji: '🥭', name: 'Mango',        te: 'మామిడి',        cat: 'fruits',     today: 140, prev: 160, chg: -20, unit: 'kg' },
   { id: '18', emoji: '🍊', name: 'Orange',       te: 'నారింజ',        cat: 'fruits',     today: 60,  prev: 55,  chg: +5,  unit: 'kg' },
-  { id: '19', emoji: '😤', name: 'Bitter Gourd', te: 'కాకరకాయ',       cat: 'vegetables', today: 45,  prev: 40,  chg: +5,  unit: 'kg' },
-  { id: '20', emoji: '🍅', name: 'Cherry Tomato',te: 'చెర్రీ టొమాటో', cat: 'vegetables', today: 80,  prev: 75,  chg: +5,  unit: 'kg' },
+  { id: '19', emoji: '😤', name: 'Bitter Gourd',    te: 'కాకరకాయ',       cat: 'vegetables', today: 45,  prev: 40,  chg: +5,  unit: 'kg' },
+  { id: '20', emoji: '🍅', name: 'Cherry Tomato',   te: 'చెర్రీ టొమాటో', cat: 'vegetables', today: 80,  prev: 75,  chg: +5,  unit: 'kg' },
+  { id: '21', emoji: '🌸', name: 'Marigold',         te: 'బంతి పువ్వు',   cat: 'flowers',    today: 80,  prev: 70,  chg: +10, unit: 'kg' },
+  { id: '22', emoji: '🌹', name: 'Rose',             te: 'గులాబి',         cat: 'flowers',    today: 120, prev: 100, chg: +20, unit: 'doz' },
+  { id: '23', emoji: '🌺', name: 'Jasmine',          te: 'మల్లె',          cat: 'flowers',    today: 200, prev: 180, chg: +20, unit: 'kg' },
+  { id: '24', emoji: '🌻', name: 'Sunflower',        te: 'సూర్యకాంతి',    cat: 'flowers',    today: 60,  prev: 65,  chg: -5,  unit: 'bunch' },
+  { id: '25', emoji: '💐', name: 'Chrysanthemum',    te: 'చామంతి',         cat: 'flowers',    today: 45,  prev: 40,  chg: +5,  unit: 'bunch' },
 ];

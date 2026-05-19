@@ -43,6 +43,12 @@ export default function RootLayout() {
         <Stack.Screen name="checkout-payment" options={{ presentation: 'card' }} />
         <Stack.Screen name="order-success" options={{ presentation: 'card' }} />
         <Stack.Screen name="order-tracking" options={{ presentation: 'card' }} />
+        <Stack.Screen name="notifications" options={{ presentation: 'card' }} />
+        <Stack.Screen name="my-orders" options={{ presentation: 'card' }} />
+        <Stack.Screen name="saved-favourites" options={{ presentation: 'card' }} />
+        <Stack.Screen name="addresses" options={{ presentation: 'card' }} />
+        <Stack.Screen name="support" options={{ presentation: 'card' }} />
+        <Stack.Screen name="about-us" options={{ presentation: 'card' }} />
       </Stack>
     </Provider>
   );

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, Pressable, TextInput } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, Layout } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Colors } from '../../constants/colors';
@@ -25,14 +25,14 @@ const CATS: { key: ShopCat; label: string }[] = [
 function AddStepper({ product }: { product: Product }) {
   const { addItem, increase, decrease } = useCart();
   const qty = useItemQuantity(product.id);
-  const width = useSharedValue(qty > 0 ? 110 : 64);
+  const width = useSharedValue(qty > 0 ? 88 : 64);
 
   const animStyle = useAnimatedStyle(() => ({ width: width.value }));
 
   const handleAdd = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     addItem({ id: product.id, name: product.name, te: product.te, emoji: product.emoji, price: product.price, weight: product.weight, quantity: 1 });
-    width.value = withSpring(110);
+    width.value = withSpring(88);
   };
 
   const handleIncrease = () => {
@@ -73,44 +73,62 @@ const stepperStyles = StyleSheet.create({
   addBtn: { height: 36, backgroundColor: Colors.primary, borderRadius: Radius.full, overflow: 'hidden' },
   addPressable: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   addText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textInverse },
-  stepper: { height: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.primary, overflow: 'hidden', paddingHorizontal: 4 },
-  stepBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  stepIcon: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.primary },
-  qty: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.primary },
+  stepper: { height: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.primary, overflow: 'hidden', paddingHorizontal: 2 },
+  stepBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  stepIcon: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.primary },
+  qty: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.primary },
 });
 
 function ProductCard({ item }: { item: Product }) {
   return (
     <Pressable style={prodStyles.card} onPress={() => router.push({ pathname: '/shop-details', params: { id: item.id } } as any)}>
-      {item.discount > 0 && (
-        <View style={prodStyles.discountBadge}>
-          <Text style={prodStyles.discountText}>{item.discount}% off</Text>
+      {/* Photo area */}
+      <View style={prodStyles.photoArea}>
+        <View style={prodStyles.vvBadge}><Text style={prodStyles.vvText}>VV</Text></View>
+        {item.discount > 0 && (
+          <View style={prodStyles.discountBadge}>
+            <Text style={prodStyles.discountText}>{item.discount}% off</Text>
+          </View>
+        )}
+        <Text style={prodStyles.emoji}>{item.emoji}</Text>
+      </View>
+      {/* Info area */}
+      <View style={prodStyles.info}>
+        <Text style={prodStyles.name}>{item.name}</Text>
+        <Text style={prodStyles.te}>{item.te}</Text>
+        <View style={prodStyles.weightRow}>
+          <Text style={prodStyles.weight}>{item.weight}</Text>
+          <View style={prodStyles.etaChip}><Text style={prodStyles.etaText}>🕐 {item.eta}</Text></View>
         </View>
-      )}
-      <Text style={prodStyles.emoji}>{item.emoji}</Text>
-      <Text style={prodStyles.name}>{item.name}</Text>
-      <Text style={prodStyles.te}>{item.te}</Text>
-      <Text style={prodStyles.weight}>{item.weight} · {item.eta}</Text>
-      <View style={prodStyles.footer}>
-        <View>
-          <Text style={prodStyles.price}>₹{item.price}</Text>
-          <Text style={prodStyles.orig}>₹{item.orig}</Text>
+        <View style={prodStyles.footer}>
+          <View style={prodStyles.priceRow}>
+            <Text style={prodStyles.price}>₹{item.price}</Text>
+            <Text style={prodStyles.orig}>₹{item.orig}</Text>
+          </View>
+          <AddStepper product={item} />
         </View>
-        <AddStepper product={item} />
       </View>
     </Pressable>
   );
 }
 
 const prodStyles = StyleSheet.create({
-  card: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, ...Shadow.sm, position: 'relative' },
+  card: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm },
+  photoArea: { height: 140, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  vvBadge: { position: 'absolute', top: Spacing.sm, left: Spacing.sm, backgroundColor: Colors.primary, borderRadius: Radius.sm, paddingHorizontal: Spacing.xs, paddingVertical: 2, zIndex: 1 },
+  vvText: { fontFamily: FontFamily.bold, fontSize: 9, color: Colors.textInverse },
   discountBadge: { position: 'absolute', top: Spacing.sm, right: Spacing.sm, backgroundColor: Colors.danger, borderRadius: Radius.full, paddingHorizontal: Spacing.xs, paddingVertical: 2, zIndex: 1 },
   discountText: { fontFamily: FontFamily.bold, fontSize: 9, color: Colors.textInverse },
-  emoji: { fontSize: 48, marginBottom: Spacing.sm },
+  emoji: { fontSize: 56 },
+  info: { padding: Spacing.md },
   name: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary, marginBottom: 2 },
-  te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: 2 },
-  weight: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.sm },
-  footer: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.xs },
+  weightRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
+  weight: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted },
+  etaChip: { backgroundColor: Colors.primaryPale, borderRadius: Radius.full, paddingHorizontal: Spacing.xs, paddingVertical: 2 },
+  etaText: { fontFamily: FontFamily.regular, fontSize: 9, color: Colors.primary },
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
   price: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary },
   orig: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, textDecorationLine: 'line-through' },
 });
@@ -183,7 +201,7 @@ const styles = StyleSheet.create({
   title: { fontFamily: FontFamily.bold, fontSize: FontSize.xxl, color: Colors.textInverse, letterSpacing: -0.3, marginBottom: Spacing.md },
   searchRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
   searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: Spacing.sm },
-  searchInput: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.primary, padding: 0 },
+  searchInput: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.primary, padding: 0, outlineStyle: 'none' } as any,
   cartBtn: { width: 44, height: 44, borderRadius: Radius.full, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   cartBadge: { position: 'absolute', top: -2, right: -2, backgroundColor: Colors.danger, borderRadius: 999, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   cartBadgeText: { fontFamily: FontFamily.bold, fontSize: 9, color: Colors.textInverse },

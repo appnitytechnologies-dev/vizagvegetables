@@ -6,7 +6,7 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
-import { Spacing, Radius, Shadow } from '../constants/spacing';
+import { Spacing, Radius } from '../constants/spacing';
 import { useCart } from '../hooks/useCart';
 import { CartItem } from '../store/cartSlice';
 import StepperBar from '../components/StepperBar';
@@ -24,23 +24,26 @@ function CartItemRow({ item }: { item: CartItem }) {
         <Text style={itemStyles.weight}>{item.weight}</Text>
         <Text style={itemStyles.price}>₹{item.price}</Text>
       </View>
-      <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); removeItem(item.id); }}>
-        <Ionicons name="trash-outline" size={18} color={Colors.textMuted} />
-      </Pressable>
-      <View style={itemStyles.stepper}>
-        <Pressable
-          style={itemStyles.stepBtn}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); decrease(item.id); }}
-        >
-          <Text style={itemStyles.stepIcon}>−</Text>
+      {/* Trash + stepper stacked on right */}
+      <View style={itemStyles.rightCol}>
+        <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); removeItem(item.id); }}>
+          <Ionicons name="trash-outline" size={18} color={Colors.textMuted} />
         </Pressable>
-        <Text style={itemStyles.qty}>{item.quantity}</Text>
-        <Pressable
-          style={[itemStyles.stepBtn, itemStyles.stepBtnFilled]}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); increase(item.id); }}
-        >
-          <Text style={[itemStyles.stepIcon, { color: Colors.textInverse }]}>+</Text>
-        </Pressable>
+        <View style={itemStyles.stepper}>
+          <Pressable
+            style={itemStyles.stepBtn}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); decrease(item.id); }}
+          >
+            <Text style={itemStyles.stepIcon}>−</Text>
+          </Pressable>
+          <Text style={itemStyles.qty}>{item.quantity}</Text>
+          <Pressable
+            style={[itemStyles.stepBtn, itemStyles.stepBtnPlus]}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); increase(item.id); }}
+          >
+            <Text style={itemStyles.stepIconPlus}>+</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -48,16 +51,18 @@ function CartItemRow({ item }: { item: CartItem }) {
 
 const itemStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', padding: Spacing.lg, gap: Spacing.md },
-  emojiWrap: { width: 60, height: 60, borderRadius: Radius.md, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center' },
-  emoji: { fontSize: 32 },
+  emojiWrap: { width: 70, height: 70, borderRadius: Radius.md, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center' },
+  emoji: { fontSize: 34 },
   info: { flex: 1 },
   name: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
-  weight: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: 2 },
+  weight: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: 4 },
   price: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.primary },
+  rightCol: { alignItems: 'flex-end', justifyContent: 'space-between', gap: Spacing.md },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   stepBtn: { width: 32, height: 32, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
-  stepBtnFilled: { backgroundColor: Colors.primaryLight, borderColor: Colors.primaryLight },
+  stepBtnPlus: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   stepIcon: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.primary },
+  stepIconPlus: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textInverse },
   qty: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary, minWidth: 20, textAlign: 'center' },
 });
 

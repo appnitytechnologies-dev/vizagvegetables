@@ -124,11 +124,7 @@ export default function OtpVerify() {
           style={[styles.verifyBtn, !isComplete && styles.verifyBtnDisabled]}
           onPress={handleVerify}
         >
-          <Text style={styles.verifyBtnText}>Verify &amp; Continue</Text>
-        </Pressable>
-
-        <Pressable onPress={() => router.back()} style={styles.changeWrap}>
-          <Text style={styles.changeText}>Change number</Text>
+          <Text style={styles.verifyBtnText}>Verify & Continue</Text>
         </Pressable>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -195,7 +191,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     width: '100%',
     height: '100%',
-  },
+    outlineStyle: 'none',
+  } as any,
   resendRow: {
     alignItems: 'center',
     gap: Spacing.xs,
@@ -229,11 +226,5 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.semiBold,
     fontSize: FontSize.md,
     color: Colors.textInverse,
-  },
-  changeWrap: { alignItems: 'center' },
-  changeText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.sm,
-    color: Colors.primary,
   },
 });

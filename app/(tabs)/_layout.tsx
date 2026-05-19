@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router';
+import { Tabs, usePathname } from 'expo-router';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -61,6 +61,8 @@ function TabBar({ state, descriptors, navigation }: any) {
 }
 
 export default function TabsLayout() {
+  const pathname = usePathname();
+
   return (
     <View style={{ flex: 1 }}>
       <Tabs tabBar={props => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
@@ -70,7 +72,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="shop" />
         <Tabs.Screen name="profile" />
       </Tabs>
-      <CartFAB />
+      {!pathname.endsWith('/shop') && <CartFAB />}
     </View>
   );
 }

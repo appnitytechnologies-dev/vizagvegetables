@@ -9,11 +9,13 @@ import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
 import { user } from '../dummy-data/user';
+import { useCart } from '../hooks/useCart';
 import StepperBar from '../components/StepperBar';
 import Divider from '../components/ui/Divider';
 
 export default function CheckoutAddress() {
   const [selected, setSelected] = useState(user.addresses[0].id);
+  const { count, total } = useCart();
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -23,7 +25,7 @@ export default function CheckoutAddress() {
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={20} color={Colors.textPrimary} />
         </Pressable>
-        <Text style={styles.title}>My Cart</Text>
+        <Text style={styles.title}>My Cart{count > 0 ? `(${count})` : ''}</Text>
         <View style={{ width: 32 }} />
       </View>
       <Divider />
@@ -77,7 +79,7 @@ export default function CheckoutAddress() {
             router.push('/checkout-payment' as any);
           }}
         >
-          <Text style={styles.continueText}>Continue to Payment</Text>
+          <Text style={styles.continueText}>Go to Checkout — ₹{total}</Text>
         </Pressable>
       </View>
     </SafeAreaView>

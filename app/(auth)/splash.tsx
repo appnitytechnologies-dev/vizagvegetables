@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { Text, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
-import { Spacing, Radius } from '../../constants/spacing';
+import { Spacing } from '../../constants/spacing';
 
 export default function SplashScreen() {
   const scale = useSharedValue(0.6);
@@ -40,23 +40,15 @@ export default function SplashScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
+
       <Animated.View style={[styles.logoWrap, logoStyle]}>
         <Text style={styles.logoText}>VV</Text>
       </Animated.View>
 
       <Animated.View style={[styles.textWrap, textStyle]}>
         <Text style={styles.title}>Vizag Vegetables</Text>
-        <Text style={styles.subtitle}>
-          Daily Rythu Bazar Rates · Market Updates
-        </Text>
-
-        <View style={styles.pillsRow}>
-          {['Daily Prices', 'Find Markets', 'Order Fresh'].map(pill => (
-            <View key={pill} style={styles.pill}>
-              <Text style={styles.pillText}>{pill}</Text>
-            </View>
-          ))}
-        </View>
+        <Text style={styles.subtitleLine}>Daily Rythu Bazar Rates</Text>
+        <Text style={styles.subtitleLine}>Market Updates</Text>
       </Animated.View>
     </SafeAreaView>
   );
@@ -71,52 +63,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xxl,
   },
   logoWrap: {
-    width: 100,
-    height: 100,
-    borderRadius: Radius.xxl,
-    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.xxl,
+    marginBottom: 32,
   },
   logoText: {
     fontFamily: FontFamily.bold,
-    fontSize: 42,
+    fontSize: 96,
     color: Colors.textInverse,
-    letterSpacing: -1,
+    letterSpacing: -4,
+    lineHeight: 100,
   },
   textWrap: {
     alignItems: 'center',
   },
   title: {
     fontFamily: FontFamily.bold,
-    fontSize: FontSize.xxxl,
+    fontSize: FontSize.xxl,
     color: Colors.textInverse,
     letterSpacing: -0.3,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
   },
-  subtitle: {
+  subtitleLine: {
     fontFamily: FontFamily.regular,
     fontSize: FontSize.sm,
     color: 'rgba(255,255,255,0.75)',
-    letterSpacing: 1,
+    letterSpacing: 2,
     textAlign: 'center',
-    marginBottom: Spacing.xxl,
-  },
-  pillsRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-  },
-  pill: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: Radius.full,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-  },
-  pillText: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.xs,
-    color: Colors.textInverse,
+    lineHeight: 22,
   },
 });

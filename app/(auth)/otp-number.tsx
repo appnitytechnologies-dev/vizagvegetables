@@ -19,7 +19,6 @@ import { Spacing, Radius, Shadow } from '../../constants/spacing';
 
 export default function OtpNumber() {
   const [phone, setPhone] = useState('');
-  const [focused, setFocused] = useState(false);
 
   const isValid = phone.length === 10;
 
@@ -41,7 +40,6 @@ export default function OtpNumber() {
       <View style={styles.greenTop}>
         <View style={styles.illustrationWrap}>
           <Text style={styles.illustrationEmoji}>🛒👨‍👩‍👧‍👦</Text>
-          <Text style={styles.illustrationSub}>Fresh Groceries Delivered</Text>
         </View>
       </View>
 
@@ -53,22 +51,16 @@ export default function OtpNumber() {
           contentContainerStyle={styles.bottomCard}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.title}>Login to Continue</Text>
-          <Text style={styles.subtitle}>Enter your mobile number to get started</Text>
-
-          <View style={[styles.inputRow, focused && styles.inputRowFocused]}>
+          <View style={styles.inputRow}>
             <Text style={styles.prefix}>+91</Text>
-            <View style={styles.dividerV} />
             <TextInput
               style={styles.input}
-              placeholder="Enter mobile number"
+              placeholder="9999999999"
               placeholderTextColor={Colors.textMuted}
               keyboardType="phone-pad"
               maxLength={10}
               value={phone}
               onChangeText={setPhone}
-              onFocus={() => setFocused(true)}
-              onBlur={() => setFocused(false)}
               autoFocus
             />
           </View>
@@ -87,7 +79,9 @@ export default function OtpNumber() {
           </View>
 
           <Pressable style={styles.googleBtn}>
-            <Text style={styles.googleIcon}>G</Text>
+            <View style={styles.googleIconCircle}>
+              <Text style={styles.googleIconText}>G</Text>
+            </View>
             <Text style={styles.googleText}>Google</Text>
           </Pressable>
 
@@ -110,56 +104,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   illustrationWrap: { alignItems: 'center' },
-  illustrationEmoji: { fontSize: 64, marginBottom: Spacing.sm },
-  illustrationSub: {
-    fontFamily: FontFamily.medium,
-    fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.8)',
-  },
+  illustrationEmoji: { fontSize: 80 },
   bottomCard: {
     flexGrow: 1,
     backgroundColor: Colors.surface,
-    borderTopLeftRadius: Radius.xxl,
-    borderTopRightRadius: Radius.xxl,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
     paddingHorizontal: Spacing.xxl,
     paddingTop: Spacing.xxxl,
     paddingBottom: Spacing.xxxl,
     gap: Spacing.lg,
-  },
-  title: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xxl,
-    color: Colors.textPrimary,
-    letterSpacing: -0.3,
-  },
-  subtitle: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    marginTop: -Spacing.sm,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: Radius.full,
     borderWidth: 1.5,
-    borderColor: Colors.border,
+    borderColor: Colors.primary,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     backgroundColor: Colors.surface,
-    ...Shadow.sm,
   },
-  inputRowFocused: { borderColor: Colors.primary },
   prefix: {
     fontFamily: FontFamily.medium,
     fontSize: FontSize.md,
     color: Colors.textPrimary,
-  },
-  dividerV: {
-    width: 1,
-    height: 20,
-    backgroundColor: Colors.border,
-    marginHorizontal: Spacing.md,
+    marginRight: Spacing.sm,
   },
   input: {
     flex: 1,
@@ -167,7 +137,8 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
     color: Colors.textPrimary,
     padding: 0,
-  },
+    outlineStyle: 'none',
+  } as any,
   sendBtn: {
     backgroundColor: Colors.primary,
     borderRadius: Radius.full,
@@ -195,16 +166,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: Radius.full,
-    borderWidth: 1.5,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
     borderColor: Colors.border,
     paddingVertical: Spacing.md,
-    gap: Spacing.sm,
+    gap: Spacing.md,
     ...Shadow.sm,
   },
-  googleIcon: {
+  googleIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleIconText: {
     fontFamily: FontFamily.bold,
-    fontSize: FontSize.lg,
+    fontSize: FontSize.md,
     color: '#4285F4',
   },
   googleText: {
