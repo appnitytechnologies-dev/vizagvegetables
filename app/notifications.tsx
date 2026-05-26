@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,8 +8,19 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
-import { NOTIFICATIONS, Notification } from '../dummy-data/notifications';
+import { api, ApiOrder, ApiProduct } from '../lib/api';
 import Divider from '../components/ui/Divider';
+
+/* ── Types ──────────────────────────────────────────────────── */
+interface Notification {
+  id:    string;
+  type:  'price' | 'order' | 'offer';
+  icon:  string;
+  title: string;
+  body:  string;
+  time:  string;
+  read:  boolean;
+}
 
 const TYPE_COLOR: Record<Notification['type'], string> = {
   price: Colors.primaryLight,
@@ -17,14 +28,90 @@ const TYPE_COLOR: Record<Notification['type'], string> = {
   offer: '#FFF3E0',
 };
 
-const TYPE_ICON_COLOR: Record<Notification['type'], string> = {
-  price: Colors.primary,
-  order: '#1565C0',
-  offer: '#E65100',
+const STATUS_COPY: Record<string, { icon: string; title: string; body: (id: string) => string }> = {
+  pending:          { icon: '📦', title: 'Order Received',     body: id => `Your order ${id} has been received and is pending confirmation.` },
+  confirmed:        { icon: '✅', title: 'Order Confirmed',    body: id => `Great news! Order ${id} has been confirmed by our team.` },
+  preparing:        { icon: '🛍️', title: 'Order Being Packed', body: id => `Order ${id} is being packed with fresh vegetables.` },
+  out_for_delivery: { icon: '🛵', title: 'Out for Delivery',   body: id => `Order ${id} is on its way to you!` },
+  delivered:        { icon: '🏠', title: 'Order Delivered',    body: id => `Order ${id} has been delivered. Enjoy your fresh veggies!` },
+  cancelled:        { icon: '❌', title: 'Order Cancelled',    body: id => `Order ${id} was cancelled.` },
 };
 
+function timeAgo(iso: string) {
+  try {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins  = Math.floor(diff / 60000);
+    const hours = Math.floor(mins / 60);
+    const days  = Math.floor(hours / 24);
+    if (days > 0)  return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (mins > 0)  return `${mins}m ago`;
+    return 'Just now';
+  } catch { return ''; }
+}
+
+function buildNotifications(orders: ApiOrder[], products: ApiProduct[]): Notification[] {
+  const notifs: Notification[] = [];
+
+  /* Order notifications — one per order (latest status) */
+  orders.slice(0, 6).forEach(order => {
+    const shortId = `#${order.id.slice(0, 6).toUpperCase()}`;
+    const copy = STATUS_COPY[order.status] ?? STATUS_COPY.pending;
+    notifs.push({
+      id:    `order-${order.id}`,
+      type:  'order',
+      icon:  copy.icon,
+      title: copy.title,
+      body:  copy.body(shortId),
+      time:  timeAgo(order.created_at),
+      read:  ['delivered', 'cancelled'].includes(order.status),
+    });
+  });
+
+  /* Price notifications — products with a price drop */
+  products
+    .filter(p => p.previous_price > p.price)
+    .slice(0, 3)
+    .forEach(p => {
+      const drop = p.previous_price - p.price;
+      notifs.push({
+        id:    `price-${p.id}`,
+        type:  'price',
+        icon:  '📉',
+        title: 'Price Drop!',
+        body:  `${p.emoji ?? ''} ${p.name} dropped to ₹${p.price}/${p.unit} — down ₹${drop} today.`,
+        time:  'Today',
+        read:  false,
+      });
+    });
+
+  /* Static promo */
+  notifs.push({
+    id:    'promo-free-delivery',
+    type:  'offer',
+    icon:  '🎁',
+    title: 'Free Delivery!',
+    body:  'Orders above ₹500 get free delivery. Add a few more items!',
+    time:  'Today',
+    read:  true,
+  });
+
+  return notifs;
+}
+
+/* ── Screen ─────────────────────────────────────────────────── */
 export default function NotificationsScreen() {
-  const [notifs, setNotifs] = useState(NOTIFICATIONS);
+  const [notifs,  setNotifs]  = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      api.get<ApiOrder[]>('/api/orders/my').catch(() => [] as ApiOrder[]),
+      api.get<ApiProduct[]>('/api/products?limit=50').catch(() => [] as ApiProduct[]),
+    ]).then(([orders, products]) => {
+      setNotifs(buildNotifications(orders, products));
+    }).finally(() => setLoading(false));
+  }, []);
 
   const unreadCount = notifs.filter(n => !n.read).length;
 
@@ -60,7 +147,11 @@ export default function NotificationsScreen() {
       </View>
       <Divider />
 
-      {notifs.length === 0 ? (
+      {loading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      ) : notifs.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyEmoji}>🔔</Text>
           <Text style={styles.emptyTitle}>You're all caught up!</Text>

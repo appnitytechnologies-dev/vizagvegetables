@@ -1,15 +1,52 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, TextInput, ScrollView } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, Pressable, TextInput, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useSelector } from 'react-redux';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius, Shadow } from '../../constants/spacing';
-import { marketRates, MarketRate } from '../../dummy-data/marketRates';
+import { api, ApiProduct } from '../../lib/api';
+import { selectAuth } from '../../store/authSlice';
 import { useFavourites } from '../../hooks/useFavourites';
 import Badge from '../../components/ui/Badge';
-import Chip from '../../components/ui/Chip';
+
+/* local shape the UI expects */
+export interface MarketRate {
+  id: string;
+  emoji: string;
+  name: string;
+  te: string;
+  cat: 'vegetables' | 'fruits' | 'leafy' | 'flowers';
+  today: number;
+  prev: number;
+  chg: number;
+  unit: string;
+}
+
+function toCat(categoryName: string): MarketRate['cat'] {
+  const n = categoryName.toLowerCase();
+  if (n.includes('fruit')) return 'fruits';
+  if (n.includes('leaf') || n.includes('green')) return 'leafy';
+  if (n.includes('flower')) return 'flowers';
+  return 'vegetables';
+}
+
+function toRate(p: ApiProduct): MarketRate {
+  return {
+    id:    p.id,
+    emoji: p.emoji || '🥦',
+    name:  p.name,
+    te:    p.telugu_name || '',
+    cat:   toCat(p.category_name),
+    today: p.price,
+    prev:  p.previous_price,
+    chg:   +(p.price - p.previous_price).toFixed(0),
+    unit:  p.unit,
+  };
+}
 
 type Category = 'all' | 'vegetables' | 'fruits' | 'leafy' | 'flowers' | 'favourite';
 const CATEGORIES: { key: Category; label: string }[] = [
@@ -26,7 +63,10 @@ function PriceRowItem({ item, isFav, onToggleFav }: { item: MarketRate; isFav: b
     <View style={listStyles.row}>
       <View style={listStyles.itemCell}>
         <Text style={listStyles.emoji}>{item.emoji}</Text>
-        <Text style={listStyles.name}>{item.name}</Text>
+        <View>
+          <Text style={listStyles.name}>{item.name}</Text>
+          <Text style={listStyles.nameTe}>{item.te}</Text>
+        </View>
       </View>
       <Text style={listStyles.today}>₹{item.today}</Text>
       <Text style={listStyles.prev}>₹{item.prev}</Text>
@@ -61,9 +101,34 @@ export default function PriceScreen() {
   const [category, setCategory] = useState<Category>('all');
   const [query, setQuery] = useState('');
   const [isGrid, setIsGrid] = useState(false);
+  const [rates, setRates] = useState<MarketRate[]>([]);
+  const [loading, setLoading] = useState(true);
   const { ids, toggle } = useFavourites();
+  const auth = useSelector(selectAuth);
 
-  const filtered = marketRates.filter(r => {
+  const handleToggleFav = (id: string) => {
+    if (!auth.isLoggedIn) {
+      Alert.alert(
+        'Login Required',
+        'Please log in to save favourites',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Login', onPress: () => router.push('/(auth)/otp-number' as any) },
+        ]
+      );
+      return;
+    }
+    toggle(id);
+  };
+
+  useEffect(() => {
+    api.get<ApiProduct[]>('/api/products?limit=200')
+      .then(data => setRates(data.filter(p => p.is_active).map(toRate)))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = rates.filter((r: MarketRate) => {
     const matchCat = category === 'all'
       ? true
       : category === 'favourite'
@@ -74,6 +139,15 @@ export default function PriceScreen() {
   });
 
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+  if (loading) return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar style="light" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    </SafeAreaView>
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -95,7 +169,7 @@ export default function PriceScreen() {
             <Ionicons name="search-outline" size={16} color={Colors.textMuted} />
             <TextInput
               style={styles.searchInput}
-              placeholder={`${marketRates.length} items  Search vegetables, fruits, flowers...`}
+              placeholder={`${rates.length} items  Search vegetables, fruits, flowers...`}
               placeholderTextColor={Colors.textMuted}
               value={query}
               onChangeText={setQuery}
@@ -108,11 +182,15 @@ export default function PriceScreen() {
         </View>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsRow} contentContainerStyle={{ paddingHorizontal: Spacing.xxl, gap: Spacing.sm, paddingVertical: Spacing.sm }}>
-        {CATEGORIES.map(c => (
-          <Chip key={c.key} label={c.label} active={category === c.key} onPress={() => setCategory(c.key)} />
-        ))}
-      </ScrollView>
+      <View style={styles.chipsRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.chipsContent}>
+          {CATEGORIES.map(c => (
+            <Pressable key={c.key} style={[styles.tab, category === c.key && styles.tabActive]} onPress={() => setCategory(c.key)}>
+              <Text style={[styles.tabLabel, category === c.key && styles.tabLabelActive]}>{c.label}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
 
       {isGrid ? (
         <FlatList
@@ -121,10 +199,11 @@ export default function PriceScreen() {
           numColumns={2}
           keyExtractor={i => i.id}
           showsVerticalScrollIndicator={false}
+          style={{ flex: 1 }}
           columnWrapperStyle={{ gap: Spacing.md, paddingHorizontal: Spacing.lg }}
           contentContainerStyle={{ gap: Spacing.md, paddingTop: Spacing.md, paddingBottom: 100 }}
           renderItem={({ item }) => (
-            <PriceGridItem item={item} isFav={ids.includes(item.id)} onToggleFav={() => toggle(item.id)} />
+            <PriceGridItem item={item} isFav={ids.includes(item.id)} onToggleFav={() => handleToggleFav(item.id)} />
           )}
         />
       ) : (
@@ -143,7 +222,7 @@ export default function PriceScreen() {
               <View style={{ width: 28 }} />
             </View>
           }
-          renderItem={({ item }) => <PriceRowItem item={item} isFav={ids.includes(item.id)} onToggleFav={() => toggle(item.id)} />}
+          renderItem={({ item }) => <PriceRowItem item={item} isFav={ids.includes(item.id)} onToggleFav={() => handleToggleFav(item.id)} />}
           ItemSeparatorComponent={() => <View style={listStyles.sep} />}
           style={listStyles.card}
         />
@@ -153,13 +232,14 @@ export default function PriceScreen() {
 }
 
 const listStyles = StyleSheet.create({
-  card: { marginHorizontal: Spacing.lg, backgroundColor: Colors.surface, borderRadius: Radius.lg, ...Shadow.sm },
+  card: { flex: 1, marginHorizontal: Spacing.lg, backgroundColor: Colors.surface, borderRadius: Radius.lg, ...Shadow.sm },
   header: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primaryPale, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg },
   headerCol: { flex: 1, fontFamily: FontFamily.semiBold, fontSize: FontSize.xs, color: Colors.primary, textAlign: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, paddingVertical: Spacing.md },
   itemCell: { flex: 2, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   emoji: { fontSize: 22 },
   name: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textPrimary },
+  nameTe: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 1 },
   today: { flex: 1, fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary, textAlign: 'center' },
   prev: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center' },
   chgCell: { flex: 1, alignItems: 'center' },
@@ -191,5 +271,10 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textPrimary, padding: 0, outlineStyle: 'none' } as any,
   toggleBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: 4, ...Shadow.sm },
   toggleText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.primary },
-  chipsRow: { maxHeight: 56, backgroundColor: Colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
+  chipsRow: { height: 60, overflow: 'hidden', backgroundColor: Colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border },
+  chipsContent: { paddingHorizontal: Spacing.lg, alignItems: 'center' },
+  tab: { borderRadius: Radius.full, paddingHorizontal: Spacing.lg, paddingVertical: 7, backgroundColor: 'rgba(0,0,0,0.06)', marginRight: Spacing.sm },
+  tabActive: { backgroundColor: Colors.primary },
+  tabLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
+  tabLabelActive: { color: Colors.textInverse },
 });

@@ -1,13 +1,16 @@
-import { Tabs, usePathname } from 'expo-router';
+import { Tabs, usePathname, useRouter } from 'expo-router';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useSelector, useDispatch } from 'react-redux';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Shadow, Spacing } from '../../constants/spacing';
 import CartFAB from '../../components/CartFAB';
 import { useCart } from '../../hooks/useCart';
+import { AppDispatch } from '../../store';
+import { selectIsGuest, setPendingAction } from '../../store/authSlice';
 
 const TABS = [
   { name: 'home',    label: 'Home',    icon: 'home-outline',         iconActive: 'home' },
@@ -17,9 +20,12 @@ const TABS = [
   { name: 'profile', label: 'Profile', icon: 'person-outline',       iconActive: 'person' },
 ] as const;
 
-function TabBar({ state, descriptors, navigation }: any) {
+function TabBar({ state, navigation }: any) {
   const insets = useSafeAreaInsets();
   const { count } = useCart();
+  const isGuest = useSelector(selectIsGuest);
+  const dispatch = useDispatch<AppDispatch>();
+  const router = useRouter();
 
   return (
     <View style={[styles.tabBar, { paddingBottom: insets.bottom || Spacing.sm }]}>
@@ -30,6 +36,11 @@ function TabBar({ state, descriptors, navigation }: any) {
 
         const onPress = () => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          if (tab.name === 'profile' && isGuest) {
+            dispatch(setPendingAction({ type: 'VIEW_PROFILE', returnTo: '/(tabs)/profile' }));
+            router.push('/(auth)/otp-number');
+            return;
+          }
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
           if (!focused && !event.defaultPrevented) {
             navigation.navigate(route.name);

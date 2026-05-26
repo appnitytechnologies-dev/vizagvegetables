@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Dimensions, Share } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Share, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,40 +8,90 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
-import { products } from '../dummy-data/products';
+import { api, ApiProduct } from '../lib/api';
 import { useCart, useItemQuantity } from '../hooks/useCart';
 
-Dimensions.get('window');
-const WEIGHTS = ['1kg', '5kg', '10kg'];
+const QTY_OPTIONS = [1, 2, 5, 10];
 
 export default function ShopDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const product = products.find(p => p.id === id) ?? products[0];
-  const [selectedWeight, setSelectedWeight] = useState(WEIGHTS[0]);
+  const [product, setProduct] = useState<ApiProduct | null>(null);
+  const [loading, setLoading]  = useState(true);
+  const [selectedQty, setSelectedQty] = useState(1);
   const { addItem, increase, decrease } = useCart();
-  const qty = useItemQuantity(product.id);
+  const cartQty = useItemQuantity(id || '');
+
+  useEffect(() => {
+    if (!id) return;
+    api.get<ApiProduct>(`/api/products/${id}`)
+      .then(setProduct)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [id]);
 
   const handleShare = async () => {
+    if (!product) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Share.share({
       title: product.name,
-      message: `🛒 ${product.name} — ₹${product.price}/${product.weight}\n${product.description}\n\nOrder fresh from Vizag Vegetables!`,
+      message: `🛒 ${product.name} — ₹${product.price}/${product.unit}\nOrder fresh from Vizag Vegetables!`,
     });
   };
 
   const handleAddToCart = () => {
+    if (!product) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    addItem({ id: product.id, name: product.name, te: product.te, emoji: product.emoji, price: product.price, weight: selectedWeight, quantity: 1 });
+    addItem({
+      id: product.id,
+      name: product.name,
+      te: product.telugu_name || '',
+      emoji: product.emoji || '🥦',
+      price: product.price,
+      weight: `${selectedQty} ${product.unit}`,
+      quantity: selectedQty,
+    });
   };
+
+  if (loading) return (
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <StatusBar style="dark" />
+      <Pressable style={[styles.iconBtn, { left: Spacing.lg, top: Spacing.lg + 44 }]} onPress={() => router.back()}>
+        <Ionicons name="chevron-back" size={20} color={Colors.textPrimary} />
+      </Pressable>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    </SafeAreaView>
+  );
+
+  if (!product) return (
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <StatusBar style="dark" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md }}>
+        <Text style={{ fontSize: 48 }}>😕</Text>
+        <Text style={{ fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary }}>Product not found</Text>
+        <Pressable onPress={() => router.back()}><Text style={{ color: Colors.primary, fontFamily: FontFamily.medium }}>Go back</Text></Pressable>
+      </View>
+    </SafeAreaView>
+  );
+
+  const discount = product.previous_price > product.price
+    ? Math.round(((product.previous_price - product.price) / product.previous_price) * 100)
+    : 0;
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <StatusBar style="dark" />
 
-      {/* Image hero */}
+      {/* Hero */}
       <View style={styles.heroWrap}>
         <View style={styles.hero}>
-          <Text style={styles.heroEmoji}>{product.emoji}</Text>
+          <Text style={styles.heroEmoji}>{product.emoji || '🥦'}</Text>
+          {discount > 0 && (
+            <View style={styles.discountBadge}>
+              <Text style={styles.discountText}>{discount}% OFF</Text>
+            </View>
+          )}
         </View>
         <Pressable style={[styles.iconBtn, { left: Spacing.lg }]} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={20} color={Colors.textPrimary} />
@@ -49,11 +99,6 @@ export default function ShopDetails() {
         <Pressable style={[styles.iconBtn, { right: Spacing.lg }]} onPress={handleShare}>
           <Ionicons name="share-outline" size={20} color={Colors.textPrimary} />
         </Pressable>
-        <View style={styles.dotsRow}>
-          {[0, 1, 2].map(i => (
-            <View key={i} style={[styles.dot, i === 0 && styles.dotActive]} />
-          ))}
-        </View>
       </View>
 
       {/* Bottom sheet */}
@@ -61,25 +106,31 @@ export default function ShopDetails() {
         <View style={styles.sheetHandle} />
 
         <View style={styles.nameRow}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={styles.productName}>{product.name}</Text>
-            <Text style={styles.productUnit}>{product.weight}, Price</Text>
+            {product.telugu_name ? <Text style={styles.productTe}>{product.telugu_name}</Text> : null}
+            <Text style={styles.productUnit}>per {product.unit}</Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={styles.price}>₹ {product.price}</Text>
-            <Text style={styles.origPrice}>₹{product.orig}</Text>
+            <Text style={styles.price}>₹{product.price}</Text>
+            {product.previous_price > product.price && (
+              <Text style={styles.origPrice}>₹{product.previous_price}</Text>
+            )}
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>Select Weight</Text>
+        {/* Quantity selector */}
+        <Text style={styles.sectionLabel}>Select Quantity</Text>
         <View style={styles.weightRow}>
-          {WEIGHTS.map(w => (
+          {QTY_OPTIONS.map(q => (
             <Pressable
-              key={w}
-              style={[styles.weightChip, selectedWeight === w && styles.weightChipActive]}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedWeight(w); }}
+              key={q}
+              style={[styles.weightChip, selectedQty === q && styles.weightChipActive]}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedQty(q); }}
             >
-              <Text style={[styles.weightText, selectedWeight === w && styles.weightTextActive]}>{w}</Text>
+              <Text style={[styles.weightText, selectedQty === q && styles.weightTextActive]}>
+                {q} {product.unit}
+              </Text>
             </Pressable>
           ))}
         </View>
@@ -87,17 +138,17 @@ export default function ShopDetails() {
         <View style={styles.divider} />
 
         <Text style={styles.sectionLabel}>Product Detail</Text>
-        <Text style={styles.description}>{product.description}</Text>
+        <Text style={styles.description}>
+          {product.description || `Fresh ${product.name} sourced directly from Rythu Bazar farmers. Delivered the same morning they are procured.`}
+        </Text>
 
         <View style={styles.tagsRow}>
-          {product.tags.map(tag => (
-            <View key={tag} style={styles.tag}>
-              <Text style={styles.tagText}>✓ {tag}</Text>
-            </View>
-          ))}
-          <View style={styles.tag}>
-            <Text style={styles.tagText}>✓ Pesticide-free</Text>
-          </View>
+          <View style={styles.tag}><Text style={styles.tagText}>✓ Farm Fresh</Text></View>
+          <View style={styles.tag}><Text style={styles.tagText}>✓ Daily Sourced</Text></View>
+          <View style={styles.tag}><Text style={styles.tagText}>✓ Pesticide-free</Text></View>
+          {product.category_name ? (
+            <View style={styles.tag}><Text style={styles.tagText}>✓ {product.category_name}</Text></View>
+          ) : null}
         </View>
 
         <View style={{ height: 100 }} />
@@ -105,13 +156,13 @@ export default function ShopDetails() {
 
       {/* Sticky bottom bar */}
       <View style={styles.bottomBar}>
-        {qty > 0 ? (
+        {cartQty > 0 ? (
           <View style={styles.stepper}>
             <Pressable style={styles.stepCircleBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); decrease(product.id); }}>
               <Text style={styles.stepIcon}>−</Text>
             </Pressable>
             <View style={styles.stepQtyBox}>
-              <Text style={styles.stepQty}>{qty}</Text>
+              <Text style={styles.stepQty}>{cartQty}</Text>
             </View>
             <Pressable style={styles.stepCircleBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); increase(product.id); }}>
               <Text style={styles.stepIcon}>+</Text>
@@ -121,7 +172,9 @@ export default function ShopDetails() {
           <View style={{ width: 120 }} />
         )}
         <Pressable style={styles.addToCartBtn} onPress={handleAddToCart}>
-          <Text style={styles.addToCartText}>Add to Cart</Text>
+          <Text style={styles.addToCartText}>
+            Add {selectedQty} {product.unit} · ₹{product.price * selectedQty}
+          </Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -133,21 +186,21 @@ const styles = StyleSheet.create({
   heroWrap: { height: 300, position: 'relative' },
   hero: { height: 300, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center' },
   heroEmoji: { fontSize: 120 },
+  discountBadge: { position: 'absolute', top: Spacing.lg, right: Spacing.lg, backgroundColor: Colors.danger, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
+  discountText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.textInverse },
   iconBtn: { position: 'absolute', top: Spacing.lg, width: 40, height: 40, borderRadius: Radius.sm, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', ...Shadow.sm },
-  dotsRow: { position: 'absolute', bottom: Spacing.md, alignSelf: 'center', flexDirection: 'row', gap: 6 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.border },
-  dotActive: { backgroundColor: Colors.primary, width: 16 },
   sheet: { flex: 1, backgroundColor: Colors.surface, borderTopLeftRadius: Radius.xxl, borderTopRightRadius: Radius.xxl, marginTop: -Radius.xxl, paddingHorizontal: Spacing.xxl },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginTop: Spacing.md, marginBottom: Spacing.lg },
   nameRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.xl },
   productName: { fontFamily: FontFamily.bold, fontSize: FontSize.xxxl, color: Colors.textPrimary, letterSpacing: -0.3 },
-  productUnit: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary },
+  productTe: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, marginTop: 2 },
+  productUnit: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
   price: { fontFamily: FontFamily.bold, fontSize: FontSize.xxxl, color: Colors.textPrimary, letterSpacing: -0.3 },
   origPrice: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, textDecorationLine: 'line-through' },
   sectionLabel: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.sm },
-  weightRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl },
+  weightRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl, flexWrap: 'wrap' },
   weightChip: { borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.sm, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm },
-  weightChipActive: { borderColor: Colors.primary, backgroundColor: Colors.surface },
+  weightChipActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
   weightText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
   weightTextActive: { color: Colors.primary },
   divider: { height: 1, backgroundColor: Colors.border, marginBottom: Spacing.xl },

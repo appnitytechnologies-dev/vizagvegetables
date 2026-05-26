@@ -6,9 +6,49 @@ import { router } from 'expo-router';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius, Shadow } from '../../constants/spacing';
-import { markets, weeklyShandhas, Market } from '../../dummy-data/markets';
+
+/* ── Static market data (Vizag Rythu Bazar locations) ─────── */
+interface Market {
+  id:      string;
+  name:    string;
+  area:    string;
+  km:      number;
+  vendors: number;
+  opens:   string;   // e.g. "6:00 AM"
+  closes:  string;   // e.g. "1:00 PM"
+  openHour:  number; // 24h
+  closeHour: number;
+  days:    string;
+}
+
+interface Shandha { day: string; name: string; area: string; }
+
+const MARKETS: Market[] = [
+  { id: '1', name: 'MVP Colony Rythu Bazar',  area: 'MVP Colony',    km: 1.2, vendors: 45, opens: '6:00 AM',  closes: '1:00 PM',  openHour: 6,   closeHour: 13, days: 'Mon–Sat' },
+  { id: '2', name: 'Jagadamba Rythu Bazar',   area: 'Jagadamba',     km: 2.8, vendors: 62, opens: '5:30 AM',  closes: '12:00 PM', openHour: 5.5, closeHour: 12, days: 'Daily'   },
+  { id: '3', name: 'Gajuwaka Rythu Bazar',    area: 'Gajuwaka',      km: 4.5, vendors: 38, opens: '6:00 AM',  closes: '1:00 PM',  openHour: 6,   closeHour: 13, days: 'Mon–Sat' },
+  { id: '4', name: 'Dwaraka Nagar Bazar',     area: 'Dwaraka Nagar', km: 3.1, vendors: 28, opens: '6:30 AM',  closes: '12:30 PM', openHour: 6.5, closeHour: 12.5, days: 'Daily' },
+];
+
+const SHANDHAS: Shandha[] = [
+  { day: 'Mon', name: 'RK Beach Shandha',      area: 'Beach Road'    },
+  { day: 'Tue', name: 'Pendurthi Shandha',     area: 'Pendurthi'     },
+  { day: 'Wed', name: 'Bheemli Shandha',       area: 'Bheemli'       },
+  { day: 'Thu', name: 'Simhachalam Shandha',   area: 'Simhachalam'   },
+  { day: 'Fri', name: 'Gajuwaka Shandha',      area: 'Gajuwaka'      },
+  { day: 'Sat', name: 'MVP Colony Shandha',    area: 'MVP Colony'    },
+  { day: 'Sun', name: 'Dwaraka Nagar Shandha', area: 'Dwaraka Nagar' },
+];
+
+/** Returns true if the current local time is within openHour..closeHour */
+function isOpen(m: Market): boolean {
+  const now = new Date();
+  const h   = now.getHours() + now.getMinutes() / 60;
+  return h >= m.openHour && h < m.closeHour;
+}
 
 function MarketCard({ market }: { market: Market }) {
+  const open = isOpen(market);
   return (
     <View style={card.wrap}>
       <View style={card.imagePlaceholder}>
@@ -16,9 +56,9 @@ function MarketCard({ market }: { market: Market }) {
       </View>
       <View style={card.body}>
         <View style={card.topRow}>
-          <View style={[card.statusChip, market.open ? card.open : card.closed]}>
-            <Text style={[card.statusText, market.open ? card.openText : card.closedText]}>
-              {market.open ? 'OPEN' : 'CLOSED'}
+          <View style={[card.statusChip, open ? card.openChip : card.closedChip]}>
+            <Text style={[card.statusText, open ? card.openText : card.closedText]}>
+              {open ? 'OPEN' : 'CLOSED'}
             </Text>
           </View>
         </View>
@@ -43,7 +83,10 @@ function MarketCard({ market }: { market: Market }) {
             <Ionicons name="map-outline" size={14} color={Colors.primary} />
             <Text style={card.mapText}>Map</Text>
           </Pressable>
-          <Pressable style={card.detailBtn} onPress={() => router.push('/market-detail' as any)}>
+          <Pressable
+            style={card.detailBtn}
+            onPress={() => router.push({ pathname: '/market-detail', params: { id: market.id } } as any)}
+          >
             <Text style={card.detailText}>Details</Text>
           </Pressable>
         </View>
@@ -53,7 +96,7 @@ function MarketCard({ market }: { market: Market }) {
 }
 
 export default function MarketsScreen() {
-  const today = new Date().toLocaleDateString('en-IN', { weekday: 'long' }).slice(0, 3);
+  const today = new Date().toLocaleDateString('en-IN', { weekday: 'short' }).slice(0, 3);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -69,7 +112,7 @@ export default function MarketsScreen() {
         <View style={styles.mapPlaceholder}>
           <Text style={styles.mapEmoji}>🗺️</Text>
           <Text style={styles.mapText}>Vizag Market Locations</Text>
-          {markets.map(m => (
+          {MARKETS.map(m => (
             <View key={m.id} style={styles.pin}>
               <Text style={styles.pinEmoji}>📍</Text>
               <Text style={styles.pinName}>{m.area}</Text>
@@ -79,7 +122,7 @@ export default function MarketsScreen() {
 
         <Text style={styles.sectionTitle}>Nearby Rythu Bazar</Text>
         <FlatList
-          data={markets}
+          data={MARKETS}
           keyExtractor={m => m.id}
           scrollEnabled={false}
           contentContainerStyle={{ gap: Spacing.md, paddingHorizontal: Spacing.xxl }}
@@ -88,25 +131,28 @@ export default function MarketsScreen() {
 
         <Text style={[styles.sectionTitle, { marginTop: Spacing.xl }]}>Weekly Shandhas</Text>
         <View style={styles.shandhaCard}>
-          {weeklyShandhas.map((s, i) => (
-            <View key={s.day}>
-              <View style={[styles.shandhaRow, s.day === today && styles.shandhaActive]}>
-                <View style={[styles.dayChip, s.day === today && styles.dayChipActive]}>
-                  <Text style={[styles.dayText, s.day === today && styles.dayTextActive]}>{s.day}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.shandhaName}>{s.name}</Text>
-                  <Text style={styles.shandhaArea}>{s.area}</Text>
-                </View>
-                {s.day === today && (
-                  <View style={styles.todayChip}>
-                    <Text style={styles.todayText}>Today</Text>
+          {SHANDHAS.map((s, i) => {
+            const isToday = s.day === today;
+            return (
+              <View key={s.day}>
+                <View style={[styles.shandhaRow, isToday && styles.shandhaActive]}>
+                  <View style={[styles.dayChip, isToday && styles.dayChipActive]}>
+                    <Text style={[styles.dayText, isToday && styles.dayTextActive]}>{s.day}</Text>
                   </View>
-                )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.shandhaName}>{s.name}</Text>
+                    <Text style={styles.shandhaArea}>{s.area}</Text>
+                  </View>
+                  {isToday && (
+                    <View style={styles.todayChip}>
+                      <Text style={styles.todayText}>Today</Text>
+                    </View>
+                  )}
+                </View>
+                {i < SHANDHAS.length - 1 && <View style={styles.sep} />}
               </View>
-              {i < weeklyShandhas.length - 1 && <View style={styles.sep} />}
-            </View>
-          ))}
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -120,8 +166,8 @@ const card = StyleSheet.create({
   body: { padding: Spacing.md },
   topRow: { flexDirection: 'row', marginBottom: Spacing.xs },
   statusChip: { borderRadius: Radius.full, paddingHorizontal: Spacing.sm, paddingVertical: 2 },
-  open: { backgroundColor: Colors.successLight },
-  closed: { backgroundColor: Colors.dangerLight },
+  openChip: { backgroundColor: Colors.successLight },
+  closedChip: { backgroundColor: Colors.dangerLight },
   statusText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs },
   openText: { color: Colors.success },
   closedText: { color: Colors.danger },

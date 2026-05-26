@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, TextInput } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,9 +9,51 @@ import { router } from 'expo-router';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius, Shadow } from '../../constants/spacing';
-import { products, Product } from '../../dummy-data/products';
+import { api, ApiProduct } from '../../lib/api';
 import { useCart, useItemQuantity } from '../../hooks/useCart';
+import { useAuthGuard } from '../../hooks/useAuthGuard';
 import Chip from '../../components/ui/Chip';
+
+export interface Product {
+  id: string;
+  name: string;
+  te: string;
+  emoji: string;
+  cat: 'vegetables' | 'fruits' | 'leafy' | 'combos';
+  price: number;
+  orig: number;
+  weight: string;
+  eta: string;
+  discount: number;
+  image_url: string | null;
+}
+
+function toCat(categoryName: string): Product['cat'] {
+  const n = categoryName.toLowerCase();
+  if (n.includes('fruit')) return 'fruits';
+  if (n.includes('leaf') || n.includes('green')) return 'leafy';
+  if (n.includes('combo')) return 'combos';
+  return 'vegetables';
+}
+
+function toProduct(p: ApiProduct): Product {
+  const discount = p.previous_price > p.price
+    ? Math.round(((p.previous_price - p.price) / p.previous_price) * 100)
+    : 0;
+  return {
+    id:        p.id,
+    name:      p.name,
+    te:        p.telugu_name || '',
+    emoji:     p.emoji || '🥦',
+    cat:       toCat(p.category_name),
+    price:     p.price,
+    orig:      p.previous_price,
+    weight:    p.unit,
+    eta:       '45 min',
+    discount,
+    image_url: p.image_url,
+  };
+}
 
 type ShopCat = 'all' | 'vegetables' | 'fruits' | 'leafy' | 'combos';
 const CATS: { key: ShopCat; label: string }[] = [
@@ -24,6 +66,7 @@ const CATS: { key: ShopCat; label: string }[] = [
 
 function AddStepper({ product }: { product: Product }) {
   const { addItem, increase, decrease } = useCart();
+  const { guard } = useAuthGuard();
   const qty = useItemQuantity(product.id);
   const width = useSharedValue(qty > 0 ? 88 : 64);
 
@@ -31,8 +74,13 @@ function AddStepper({ product }: { product: Product }) {
 
   const handleAdd = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    addItem({ id: product.id, name: product.name, te: product.te, emoji: product.emoji, price: product.price, weight: product.weight, quantity: 1 });
-    width.value = withSpring(88);
+    guard(
+      { type: 'ADD_TO_CART', payload: { id: product.id, name: product.name, te: product.te, emoji: product.emoji, price: product.price, weight: product.weight, quantity: 1 }, returnTo: '/(tabs)/shop' },
+      () => {
+        addItem({ id: product.id, name: product.name, te: product.te, emoji: product.emoji, price: product.price, weight: product.weight, quantity: 1 });
+        width.value = withSpring(88);
+      }
+    );
   };
 
   const handleIncrease = () => {
@@ -134,15 +182,33 @@ const prodStyles = StyleSheet.create({
 });
 
 export default function ShopScreen() {
-  const [cat, setCat] = useState<ShopCat>('all');
-  const [query, setQuery] = useState('');
+  const [cat, setCat]         = useState<ShopCat>('all');
+  const [query, setQuery]     = useState('');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const { count } = useCart();
 
-  const filtered = products.filter(p => {
+  useEffect(() => {
+    api.get<ApiProduct[]>('/api/products?limit=200')
+      .then(data => setProducts(data.filter(p => p.is_active).map(toProduct)))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = products.filter((p: Product) => {
     const matchCat = cat === 'all' || p.cat === cat;
     const matchQ = p.name.toLowerCase().includes(query.toLowerCase());
     return matchCat && matchQ;
   });
+
+  if (loading) return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar style="light" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    </SafeAreaView>
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

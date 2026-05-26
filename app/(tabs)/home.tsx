@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Pressable,
-  ScrollView, TextInput, Dimensions,
+  ScrollView, TextInput, Dimensions, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -10,12 +10,24 @@ import { router } from 'expo-router';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius, Shadow } from '../../constants/spacing';
-import { marketRates } from '../../dummy-data/marketRates';
-import { products } from '../../dummy-data/products';
-import { user } from '../../dummy-data/user';
+import { useSelector } from 'react-redux';
+import { selectAuth } from '../../store/authSlice';
+import { api, ApiProduct } from '../../lib/api';
+
+interface MarketRate { id: string; emoji: string; name: string; te: string; today: number; prev: number; chg: number; unit: string; }
+interface ShopProduct { id: string; name: string; te: string; emoji: string; price: number; orig: number; weight: string; }
+
+function apiToRate(p: ApiProduct): MarketRate {
+  return { id: p.id, emoji: p.emoji || '🥦', name: p.name, te: p.telugu_name || '', today: p.price, prev: p.previous_price, chg: +(p.price - p.previous_price).toFixed(0), unit: p.unit };
+}
+function apiToShop(p: ApiProduct): ShopProduct {
+  return { id: p.id, name: p.name, te: p.telugu_name || '', emoji: p.emoji || '🥦', price: p.price, orig: p.previous_price, weight: p.unit };
+}
 import Badge from '../../components/ui/Badge';
 import { useCart } from '../../hooks/useCart';
 import { useFavourites } from '../../hooks/useFavourites';
+import { useAuthGuard } from '../../hooks/useAuthGuard';
+import { useLocation } from '../../hooks/useLocation';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -104,20 +116,37 @@ const sh = StyleSheet.create({
 });
 
 export default function HomeScreen() {
+  const auth = useSelector(selectAuth);
   const { addItem } = useCart();
   const { ids, toggle } = useFavourites();
+  const { guard } = useAuthGuard();
+  const { locationText, loading: locLoading, isCustom, setCustomLocation, resetToGPS } = useLocation();
+  const [locationModal, setLocationModal] = useState(false);
+  const [locationInput, setLocationInput] = useState('');
   const [query, setQuery] = useState('');
-  const unreadCount = 3;
+  const [rates, setRates]             = useState<MarketRate[]>([]);
+  const [allProducts, setAllProducts] = useState<ShopProduct[]>([]);
+  const unreadCount = 0;
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+  useEffect(() => {
+    api.get<ApiProduct[]>('/api/products?limit=200')
+      .then(data => {
+        const active = data.filter(p => p.is_active);
+        setRates(active.map(apiToRate));
+        setAllProducts(active.map(apiToShop));
+      })
+      .catch(() => {});
+  }, []);
 
   const q = query.trim().toLowerCase();
   const topRates = q
-    ? marketRates.filter(r => r.name.toLowerCase().includes(q) || r.te.toLowerCase().includes(q))
-    : marketRates.slice(0, 5);
-  const favRates = marketRates.filter(r => ids.includes(r.id)).slice(0, 3);
+    ? rates.filter(r => r.name.toLowerCase().includes(q) || r.te.toLowerCase().includes(q))
+    : rates.slice(0, 5);
+  const favRates = rates.filter(r => ids.includes(r.id)).slice(0, 3);
   const shopProducts = q
-    ? products.filter(p => p.name.toLowerCase().includes(q) || p.te.toLowerCase().includes(q))
-    : products.slice(0, 4);
+    ? allProducts.filter(p => p.name.toLowerCase().includes(q) || p.te.toLowerCase().includes(q))
+    : allProducts.slice(0, 4);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -126,13 +155,21 @@ export default function HomeScreen() {
       {/* Green Header */}
       <View style={styles.header}>
         <View style={styles.headerRow1}>
-          <View style={styles.locationCol}>
+          <Pressable
+            style={styles.locationCol}
+            onPress={() => { setLocationInput(locationText); setLocationModal(true); }}
+          >
             <View style={styles.locationRow}>
               <Ionicons name="location-sharp" size={13} color={Colors.textInverse} />
               <Text style={styles.locationBrand}>Vizag Vegetables</Text>
             </View>
-            <Text style={styles.locationSub}>Gajuwaka, Nehru nagaru,....</Text>
-          </View>
+            <View style={styles.locationRow}>
+              <Text style={styles.locationSub} numberOfLines={1}>
+                {locLoading ? '...' : (locationText || 'Set location')}
+              </Text>
+              <Ionicons name="chevron-down" size={11} color={Colors.textInverse} style={{ opacity: 0.7, marginLeft: 2, marginTop: 1 }} />
+            </View>
+          </Pressable>
           <Pressable style={styles.bellBtn} onPress={() => router.push('/notifications' as any)}>
             <Ionicons name="notifications-outline" size={22} color={Colors.textInverse} />
             {unreadCount > 0 && (
@@ -143,7 +180,7 @@ export default function HomeScreen() {
           </Pressable>
         </View>
         <View style={styles.headerRow2}>
-          <Text style={styles.greeting}>Hey {user.name} 👋</Text>
+          <Text style={styles.greeting}>Hey {auth.name || 'there'} 👋</Text>
           <Text style={styles.date}>{today}</Text>
         </View>
         <View style={styles.searchBar}>
@@ -181,9 +218,9 @@ export default function HomeScreen() {
           renderItem={({ item }) => (
             <Pressable
               style={rateCard.card}
-              onPress={() => toggle(item.id)}
+              onPress={() => guard({ type: 'TOGGLE_FAVOURITE', payload: item.id, returnTo: '/(tabs)/home' }, () => toggle(item.id))}
             >
-              <Pressable onPress={() => toggle(item.id)} style={rateCard.heart}>
+              <Pressable onPress={() => guard({ type: 'TOGGLE_FAVOURITE', payload: item.id, returnTo: '/(tabs)/home' }, () => toggle(item.id))} style={rateCard.heart}>
                 <Ionicons
                   name={ids.includes(item.id) ? 'heart' : 'heart-outline'}
                   size={16}
@@ -256,7 +293,10 @@ export default function HomeScreen() {
                   </View>
                   <Pressable
                     style={prodCard.addBtn}
-                    onPress={() => addItem({ id: item.id, name: item.name, te: item.te, emoji: item.emoji, price: item.price, weight: item.weight, quantity: 1 })}
+                    onPress={() => guard(
+                      { type: 'ADD_TO_CART', payload: { id: item.id, name: item.name, te: item.te, emoji: item.emoji, price: item.price, weight: item.weight, quantity: 1 }, returnTo: '/(tabs)/home' },
+                      () => addItem({ id: item.id, name: item.name, te: item.te, emoji: item.emoji, price: item.price, weight: item.weight, quantity: 1 })
+                    )}
                   >
                     <Text style={prodCard.addText}>Add</Text>
                   </Pressable>
@@ -276,7 +316,7 @@ export default function HomeScreen() {
             <Text style={tableStyles.col}>Prev</Text>
             <Text style={tableStyles.col}>Chg</Text>
           </View>
-          {marketRates.slice(0, 8).map(r => (
+          {rates.slice(0, 8).map(r => (
             <View key={r.id} style={tableStyles.row}>
               <View style={[tableStyles.itemCol, { flex: 2 }]}>
                 <Text style={tableStyles.itemEmoji}>{r.emoji}</Text>
@@ -289,6 +329,43 @@ export default function HomeScreen() {
           ))}
         </View>
       </ScrollView>
+
+      {/* Location picker modal */}
+      <Modal visible={locationModal} transparent animationType="fade" onRequestClose={() => setLocationModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={locModal.overlay}>
+          <Pressable style={locModal.backdrop} onPress={() => setLocationModal(false)} />
+          <View style={locModal.sheet}>
+            <Text style={locModal.title}>Set your area</Text>
+            <Text style={locModal.sub}>Type your neighbourhood, area or city name</Text>
+            <TextInput
+              style={locModal.input}
+              placeholder="e.g. Gajuwaka, Vizag"
+              placeholderTextColor={Colors.textMuted}
+              value={locationInput}
+              onChangeText={setLocationInput}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                if (locationInput.trim()) { setCustomLocation(locationInput.trim()); setLocationModal(false); }
+              }}
+            />
+            <Pressable
+              style={[locModal.saveBtn, !locationInput.trim() && locModal.saveBtnDisabled]}
+              onPress={() => {
+                if (locationInput.trim()) { setCustomLocation(locationInput.trim()); setLocationModal(false); }
+              }}
+            >
+              <Text style={locModal.saveBtnText}>Save</Text>
+            </Pressable>
+            {!isCustom ? null : (
+              <Pressable style={locModal.gpsBtn} onPress={() => { resetToGPS(); setLocationModal(false); }}>
+                <Ionicons name="locate-outline" size={14} color={Colors.primary} />
+                <Text style={locModal.gpsBtnText}>Use GPS instead</Text>
+              </Pressable>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -343,6 +420,20 @@ const tableStyles = StyleSheet.create({
   today: { flex: 1, fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary, textAlign: 'center' },
   prev: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center' },
   chgCell: { flex: 1, alignItems: 'center' },
+});
+
+const locModal = StyleSheet.create({
+  overlay: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: Colors.overlay },
+  sheet: { backgroundColor: Colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.xxl, gap: Spacing.md, paddingBottom: Spacing.xxxl },
+  title: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
+  sub: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, marginBottom: Spacing.xs },
+  input: { borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.full, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, fontFamily: FontFamily.regular, fontSize: FontSize.md, color: Colors.textPrimary },
+  saveBtn: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingVertical: Spacing.lg, alignItems: 'center' },
+  saveBtnDisabled: { opacity: 0.4 },
+  saveBtnText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.md, color: Colors.textInverse },
+  gpsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, paddingVertical: Spacing.sm },
+  gpsBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary },
 });
 
 const styles = StyleSheet.create({

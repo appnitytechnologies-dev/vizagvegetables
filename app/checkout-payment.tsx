@@ -1,34 +1,67 @@
 import { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useDispatch, useSelector } from 'react-redux';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
 import { useCart } from '../hooks/useCart';
+import { selectAuth } from '../store/authSlice';
+import { clearCart } from '../store/cartSlice';
+import { AppDispatch } from '../store';
+import { api } from '../lib/api';
 import StepperBar from '../components/StepperBar';
 import Divider from '../components/ui/Divider';
 
+const DELIVERY_FEE = 30;
+
 const METHODS = [
-  { id: 'upi', icon: '📱', label: 'UPI', sub: 'Recommended' },
-  { id: 'card', icon: '💳', label: 'Credit / Debit Card', sub: '' },
-  { id: 'netbanking', icon: '🏦', label: 'Net Banking', sub: '' },
-  { id: 'cod', icon: '💵', label: 'Cash on Delivery', sub: '' },
+  { id: 'upi',        icon: '📱', label: 'UPI',                  sub: 'Recommended' },
+  { id: 'card',       icon: '💳', label: 'Credit / Debit Card',   sub: '' },
+  { id: 'netbanking', icon: '🏦', label: 'Net Banking',           sub: '' },
+  { id: 'cod',        icon: '💵', label: 'Cash on Delivery',      sub: '' },
 ];
 
 export default function CheckoutPayment() {
-  const [method, setMethod] = useState('upi');
-  const [upiId, setUpiId] = useState('');
-  const { total, clear } = useCart();
-  const delivery = 30;
+  const { address, slot } = useLocalSearchParams<{ address: string; slot: string }>();
+  const [method,  setMethod]   = useState('upi');
+  const [upiId,   setUpiId]    = useState('');
+  const [loading, setLoading]  = useState(false);
+  const [error,   setError]    = useState('');
+  const { items, total, count } = useCart();
+  const dispatch = useDispatch<AppDispatch>();
+  const auth     = useSelector(selectAuth);
+  const delivery = total >= 500 ? 0 : DELIVERY_FEE;
 
-  const handlePlaceOrder = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    clear();
-    router.replace('/order-success' as any);
+  const handlePlaceOrder = async () => {
+    if (!auth.isLoggedIn) {
+      setError('Please log in to place an order.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.post<{ id: string }>('/api/orders', {
+        items:            items.map(i => ({ product_id: i.id, quantity: i.quantity, unit_price: i.price })),
+        delivery_address: address || 'N/A',
+        delivery_slot:    slot || '9 AM – 12 PM',
+        payment_method:   method,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      dispatch(clearCart());
+      router.replace({
+        pathname: '/order-success',
+        params: { id: res.id, method, total: String(total + delivery) },
+      } as any);
+    } catch (e: any) {
+      setError(e.message || 'Failed to place order. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -43,13 +76,32 @@ export default function CheckoutPayment() {
         <View style={{ width: 32 }} />
       </View>
       <Divider />
-
       <StepperBar step={3} />
       <Divider />
 
       <ScrollView contentContainerStyle={{ padding: Spacing.xxl, gap: Spacing.lg, paddingBottom: 140 }}>
-        <Text style={styles.sectionLabel}>Payment Method</Text>
 
+        {/* Delivery summary */}
+        <View style={styles.deliveryBox}>
+          <Ionicons name="location-outline" size={16} color={Colors.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.deliveryAddress} numberOfLines={2}>{address}</Text>
+            <Text style={styles.deliverySlot}>🕐 {slot}</Text>
+          </View>
+          <Pressable onPress={() => router.back()}>
+            <Text style={styles.changeText}>Change</Text>
+          </Pressable>
+        </View>
+
+        {!!error && (
+          <View style={styles.errorBox}>
+            <Ionicons name="alert-circle-outline" size={16} color={Colors.danger} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        {/* Payment methods */}
+        <Text style={styles.sectionLabel}>Payment Method</Text>
         {METHODS.map(m => (
           <View key={m.id}>
             <Pressable
@@ -65,7 +117,6 @@ export default function CheckoutPayment() {
                 {method === m.id && <View style={styles.radioDot} />}
               </View>
             </Pressable>
-
             {method === 'upi' && m.id === 'upi' && (
               <View style={styles.upiInput}>
                 <TextInput
@@ -81,15 +132,16 @@ export default function CheckoutPayment() {
           </View>
         ))}
 
+        {/* Order summary */}
         <Text style={[styles.sectionLabel, { marginTop: Spacing.sm }]}>Order Summary</Text>
         <View style={styles.summaryCard}>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryKey}>Subtotal</Text>
+            <Text style={styles.summaryKey}>Items ({count})</Text>
             <Text style={styles.summaryVal}>₹{total}</Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryKey}>Delivery</Text>
-            <Text style={styles.summaryVal}>₹{delivery}</Text>
+            <Text style={styles.summaryVal}>{delivery === 0 ? 'FREE 🎉' : `₹${delivery}`}</Text>
           </View>
           <View style={styles.sep} />
           <View style={styles.summaryRow}>
@@ -98,15 +150,22 @@ export default function CheckoutPayment() {
           </View>
         </View>
 
-        <View style={styles.razorpayRow}>
+        <View style={styles.secureRow}>
           <Ionicons name="lock-closed" size={12} color={Colors.textMuted} />
-          <Text style={styles.razorpayText}>Secured by Razorpay · 256-bit SSL</Text>
+          <Text style={styles.secureText}>Secured by 256-bit SSL encryption</Text>
         </View>
       </ScrollView>
 
       <View style={styles.bottomBar}>
-        <Pressable style={styles.placeBtn} onPress={handlePlaceOrder}>
-          <Text style={styles.placeText}>Place Order  ₹{total + delivery}</Text>
+        <Pressable
+          style={[styles.placeBtn, loading && styles.placeBtnDisabled]}
+          onPress={handlePlaceOrder}
+          disabled={loading}
+        >
+          {loading
+            ? <ActivityIndicator color={Colors.textInverse} size="small" />
+            : <Text style={styles.placeText}>Place Order  ₹{total + delivery}</Text>
+          }
         </Pressable>
       </View>
     </SafeAreaView>
@@ -118,6 +177,12 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md },
   backBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   title: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
+  deliveryBox: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, backgroundColor: Colors.primaryPale, borderRadius: Radius.lg, padding: Spacing.lg },
+  deliveryAddress: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textPrimary, flex: 1 },
+  deliverySlot: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2 },
+  changeText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.xs, color: Colors.primary },
+  errorBox: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.dangerLight, borderRadius: Radius.md, padding: Spacing.md },
+  errorText: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.danger },
   sectionLabel: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textSecondary },
   methodRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.lg, padding: Spacing.md, backgroundColor: Colors.surface },
   methodRowActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryPale },
@@ -128,7 +193,7 @@ const styles = StyleSheet.create({
   radioActive: { borderColor: Colors.primary },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary },
   upiInput: { marginTop: Spacing.xs, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, backgroundColor: Colors.surface },
-  upiField: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textPrimary, outlineStyle: 'none' } as any,
+  upiField: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textPrimary },
   summaryCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, gap: Spacing.sm, ...Shadow.sm, borderWidth: 1, borderColor: Colors.border },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
   summaryKey: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary },
@@ -136,9 +201,10 @@ const styles = StyleSheet.create({
   sep: { height: 1, backgroundColor: Colors.border },
   totalKey: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary },
   totalVal: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.primary },
-  razorpayRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  razorpayText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted },
+  secureRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  secureText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted },
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: Colors.surface, paddingHorizontal: Spacing.xxl, paddingVertical: Spacing.lg, borderTopWidth: 1, borderTopColor: Colors.border },
   placeBtn: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingVertical: Spacing.lg, alignItems: 'center' },
+  placeBtnDisabled: { opacity: 0.6 },
   placeText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.md, color: Colors.textInverse },
 });
