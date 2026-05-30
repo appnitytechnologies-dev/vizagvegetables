@@ -93,7 +93,7 @@ export default function SavedFavourites() {
                     te:       item.telugu_name ?? '',
                     emoji:    item.emoji ?? '🥦',
                     price:    item.price,
-                    weight:   `1 ${item.unit}`,
+                    unit:     item.unit,
                     quantity: 1,
                   });
                 }}

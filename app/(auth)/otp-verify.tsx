@@ -22,7 +22,7 @@ import { Spacing, Radius, Shadow } from '../../constants/spacing';
 import { AppDispatch } from '../../store';
 import { loginSuccess, clearPendingAction, selectPendingAction } from '../../store/authSlice';
 import { addToCart, CartItem } from '../../store/cartSlice';
-import { toggleFavourite } from '../../store/favouritesSlice';
+import { toggleFavourite, setFavourites } from '../../store/favouritesSlice';
 import { api, setToken } from '../../lib/api';
 
 const OTP_LENGTH = 6;
@@ -112,12 +112,22 @@ export default function OtpVerify() {
         name:  displayName,
       }));
 
+      /* load favourites from server so they reflect what the user saved on web/other devices */
+      try {
+        const favIds = await api.get<string[]>('/api/favorites');
+        dispatch(setFavourites(favIds));
+      } catch {
+        // non-fatal — favourites start empty if network fails
+      }
+
       /* replay any action the user tried before logging in */
       if (pendingAction) {
         if (pendingAction.type === 'ADD_TO_CART' && pendingAction.payload) {
           dispatch(addToCart(pendingAction.payload as CartItem));
         } else if (pendingAction.type === 'TOGGLE_FAVOURITE' && pendingAction.payload) {
-          dispatch(toggleFavourite(pendingAction.payload as string));
+          const favId = pendingAction.payload as string;
+          dispatch(toggleFavourite(favId));
+          api.post(`/api/favorites/${favId}`, {}).catch(() => {});
         }
         const returnTo = pendingAction.returnTo;
         dispatch(clearPendingAction());

@@ -22,7 +22,7 @@ export interface Product {
   cat: 'vegetables' | 'fruits' | 'leafy' | 'combos';
   price: number;
   orig: number;
-  weight: string;
+  unit: string;
   eta: string;
   discount: number;
   image_url: string | null;
@@ -48,7 +48,7 @@ function toProduct(p: ApiProduct): Product {
     cat:       toCat(p.category_name),
     price:     p.price,
     orig:      p.previous_price,
-    weight:    p.unit,
+    unit:      p.unit,
     eta:       '45 min',
     discount,
     image_url: p.image_url,
@@ -75,9 +75,9 @@ function AddStepper({ product }: { product: Product }) {
   const handleAdd = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     guard(
-      { type: 'ADD_TO_CART', payload: { id: product.id, name: product.name, te: product.te, emoji: product.emoji, price: product.price, weight: product.weight, quantity: 1 }, returnTo: '/(tabs)/shop' },
+      { type: 'ADD_TO_CART', payload: { id: product.id, name: product.name, te: product.te, emoji: product.emoji, price: product.price, unit: product.unit, quantity: 1 }, returnTo: '/(tabs)/shop' },
       () => {
-        addItem({ id: product.id, name: product.name, te: product.te, emoji: product.emoji, price: product.price, weight: product.weight, quantity: 1 });
+        addItem({ id: product.id, name: product.name, te: product.te, emoji: product.emoji, price: product.price, unit: product.unit, quantity: 1 });
         width.value = withSpring(88);
       }
     );
@@ -144,8 +144,8 @@ function ProductCard({ item }: { item: Product }) {
       <View style={prodStyles.info}>
         <Text style={prodStyles.name}>{item.name}</Text>
         <Text style={prodStyles.te}>{item.te}</Text>
-        <View style={prodStyles.weightRow}>
-          <Text style={prodStyles.weight}>{item.weight}</Text>
+        <View style={prodStyles.unitRow}>
+          <Text style={prodStyles.unit}>{item.unit}</Text>
           <View style={prodStyles.etaChip}><Text style={prodStyles.etaText}>🕐 {item.eta}</Text></View>
         </View>
         <View style={prodStyles.footer}>
@@ -171,8 +171,8 @@ const prodStyles = StyleSheet.create({
   info: { padding: Spacing.md },
   name: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary, marginBottom: 2 },
   te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.xs },
-  weightRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
-  weight: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted },
+  unitRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
+  unit: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted },
   etaChip: { backgroundColor: Colors.primaryPale, borderRadius: Radius.full, paddingHorizontal: Spacing.xs, paddingVertical: 2 },
   etaText: { fontFamily: FontFamily.regular, fontSize: 9, color: Colors.primary },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

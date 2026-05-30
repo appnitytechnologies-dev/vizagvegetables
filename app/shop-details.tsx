@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Share, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Share, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,8 +8,10 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
-import { api, ApiProduct } from '../lib/api';
+import { api, ApiProduct, imgUrl } from '../lib/api';
 import { useCart, useItemQuantity } from '../hooks/useCart';
+import { useFavourites } from '../hooks/useFavourites';
+import { useAuthGuard } from '../hooks/useAuthGuard';
 
 const QTY_OPTIONS = [1, 2, 5, 10];
 
@@ -20,9 +22,12 @@ export default function ShopDetails() {
   const [selectedQty, setSelectedQty] = useState(1);
   const { addItem, increase, decrease } = useCart();
   const cartQty = useItemQuantity(id || '');
+  const { ids, toggle } = useFavourites();
+  const { guard } = useAuthGuard();
+  const isFav = id ? ids.includes(id) : false;
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) { setLoading(false); return; }
     api.get<ApiProduct>(`/api/products/${id}`)
       .then(setProduct)
       .catch(() => {})
@@ -47,7 +52,7 @@ export default function ShopDetails() {
       te: product.telugu_name || '',
       emoji: product.emoji || '🥦',
       price: product.price,
-      weight: `${selectedQty} ${product.unit}`,
+      unit: product.unit,
       quantity: selectedQty,
     });
   };
@@ -86,7 +91,10 @@ export default function ShopDetails() {
       {/* Hero */}
       <View style={styles.heroWrap}>
         <View style={styles.hero}>
-          <Text style={styles.heroEmoji}>{product.emoji || '🥦'}</Text>
+          {imgUrl(product.image_url)
+            ? <Image source={{ uri: imgUrl(product.image_url)! }} style={styles.heroImage} resizeMode="contain" />
+            : <Text style={styles.heroEmoji}>{product.emoji || '🥦'}</Text>
+          }
           {discount > 0 && (
             <View style={styles.discountBadge}>
               <Text style={styles.discountText}>{discount}% OFF</Text>
@@ -96,9 +104,24 @@ export default function ShopDetails() {
         <Pressable style={[styles.iconBtn, { left: Spacing.lg }]} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={20} color={Colors.textPrimary} />
         </Pressable>
-        <Pressable style={[styles.iconBtn, { right: Spacing.lg }]} onPress={handleShare}>
-          <Ionicons name="share-outline" size={20} color={Colors.textPrimary} />
-        </Pressable>
+        <View style={styles.topRight}>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => guard(
+              { type: 'TOGGLE_FAVOURITE', payload: product.id, returnTo: '/shop-details' },
+              () => toggle(product.id)
+            )}
+          >
+            <Ionicons
+              name={isFav ? 'heart' : 'heart-outline'}
+              size={20}
+              color={isFav ? Colors.danger : Colors.textPrimary}
+            />
+          </Pressable>
+          <Pressable style={styles.iconBtn} onPress={handleShare}>
+            <Ionicons name="share-outline" size={20} color={Colors.textPrimary} />
+          </Pressable>
+        </View>
       </View>
 
       {/* Bottom sheet */}
@@ -186,6 +209,8 @@ const styles = StyleSheet.create({
   heroWrap: { height: 300, position: 'relative' },
   hero: { height: 300, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center' },
   heroEmoji: { fontSize: 120 },
+  heroImage: { width: '80%', height: '80%' },
+  topRight: { position: 'absolute', top: Spacing.lg, right: Spacing.lg, flexDirection: 'row', gap: Spacing.sm },
   discountBadge: { position: 'absolute', top: Spacing.lg, right: Spacing.lg, backgroundColor: Colors.danger, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
   discountText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.textInverse },
   iconBtn: { position: 'absolute', top: Spacing.lg, width: 40, height: 40, borderRadius: Radius.sm, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', ...Shadow.sm },

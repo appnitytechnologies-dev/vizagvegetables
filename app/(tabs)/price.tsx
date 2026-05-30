@@ -26,8 +26,8 @@ export interface MarketRate {
   unit: string;
 }
 
-function toCat(categoryName: string): MarketRate['cat'] {
-  const n = categoryName.toLowerCase();
+function toCat(categoryName: string | null): MarketRate['cat'] {
+  const n = (categoryName || '').toLowerCase();
   if (n.includes('fruit')) return 'fruits';
   if (n.includes('leaf') || n.includes('green')) return 'leafy';
   if (n.includes('flower')) return 'flowers';
@@ -122,8 +122,8 @@ export default function PriceScreen() {
   };
 
   useEffect(() => {
-    api.get<ApiProduct[]>('/api/products?limit=200')
-      .then(data => setRates(data.filter(p => p.is_active).map(toRate)))
+    api.get<ApiProduct[]>('/api/market-rates?limit=500')
+      .then(data => setRates(data.map(toRate)))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

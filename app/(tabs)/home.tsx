@@ -15,13 +15,13 @@ import { selectAuth } from '../../store/authSlice';
 import { api, ApiProduct } from '../../lib/api';
 
 interface MarketRate { id: string; emoji: string; name: string; te: string; today: number; prev: number; chg: number; unit: string; }
-interface ShopProduct { id: string; name: string; te: string; emoji: string; price: number; orig: number; weight: string; }
+interface ShopProduct { id: string; name: string; te: string; emoji: string; price: number; orig: number; unit: string; }
 
 function apiToRate(p: ApiProduct): MarketRate {
   return { id: p.id, emoji: p.emoji || '🥦', name: p.name, te: p.telugu_name || '', today: p.price, prev: p.previous_price, chg: +(p.price - p.previous_price).toFixed(0), unit: p.unit };
 }
 function apiToShop(p: ApiProduct): ShopProduct {
-  return { id: p.id, name: p.name, te: p.telugu_name || '', emoji: p.emoji || '🥦', price: p.price, orig: p.previous_price, weight: p.unit };
+  return { id: p.id, name: p.name, te: p.telugu_name || '', emoji: p.emoji || '🥦', price: p.price, orig: p.previous_price, unit: p.unit };
 }
 import Badge from '../../components/ui/Badge';
 import { useCart } from '../../hooks/useCart';
@@ -30,13 +30,16 @@ import { useAuthGuard } from '../../hooks/useAuthGuard';
 import { useLocation } from '../../hooks/useLocation';
 
 const { width: SW } = Dimensions.get('window');
+const RATE_CIRCLE_COLORS = ['#FFE4E8', '#EDE4FF', '#FFE8D4', '#E4F0FF', '#E4FFE8', '#FFF4E4'];
 
 
 const BANNERS = [
-  { id: '1', emoji: '🥦', title: 'Fresh\nVegetables', subtitle: 'Farm to table daily', bg: '#E8F5E9' },
-  { id: '2', emoji: '🍅', title: 'Rythu\nBazar Rates', subtitle: 'Updated every morning', bg: '#FFF3E0' },
-  { id: '3', emoji: '🛒', title: 'Order\nOnline', subtitle: 'Delivered in 45 mins', bg: '#E3F2FD' },
+  { id: '1', bg: '#EDF8EE', leftEmojis: ['🥦', '🍅', '🧅', '🫑'] as string[], title: 'Fresh', title2: 'Vegetables', rightEmoji: '🥬' },
+  { id: '2', bg: '#FFF8E1', leftEmojis: ['⚖️', '🌾', '🥕', '💰'] as string[], title: 'Rythu Bazar', title2: 'Rates', rightEmoji: '🌿' },
+  { id: '3', bg: '#E8F4FD', leftEmojis: ['🚚', '📦', '⏱️', '✨'] as string[], title: 'Order', title2: 'Online', rightEmoji: '🛒' },
 ];
+
+const BANNER_W = SW - Spacing.lg * 2;
 
 function BannerCarousel() {
   const [active, setActive] = useState(0);
@@ -46,7 +49,7 @@ function BannerCarousel() {
     const interval = setInterval(() => {
       setActive(prev => {
         const next = (prev + 1) % BANNERS.length;
-        scrollRef.current?.scrollTo({ x: next * (SW - Spacing.lg * 2), animated: true });
+        scrollRef.current?.scrollTo({ x: next * BANNER_W, animated: true });
         return next;
       });
     }, 3500);
@@ -59,16 +62,25 @@ function BannerCarousel() {
         ref={scrollRef}
         horizontal pagingEnabled showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={e => {
-          setActive(Math.round(e.nativeEvent.contentOffset.x / (SW - Spacing.lg * 2)));
+          setActive(Math.round(e.nativeEvent.contentOffset.x / BANNER_W));
         }}
       >
         {BANNERS.map(b => (
           <View key={b.id} style={[bannerStyles.slide, { backgroundColor: b.bg }]}>
-            <Text style={bannerStyles.emoji}>{b.emoji}</Text>
-            <View>
-              <Text style={bannerStyles.title}>{b.title}</Text>
-              <Text style={bannerStyles.sub}>{b.subtitle}</Text>
+            {/* Scattered emoji cluster on the left */}
+            <View style={bannerStyles.clusterWrap}>
+              <Text style={bannerStyles.ce0}>{b.leftEmojis[0]}</Text>
+              <Text style={bannerStyles.ce1}>{b.leftEmojis[1]}</Text>
+              <Text style={bannerStyles.ce2}>{b.leftEmojis[2]}</Text>
+              <Text style={bannerStyles.ce3}>{b.leftEmojis[3]}</Text>
             </View>
+            {/* Title text */}
+            <View style={bannerStyles.textSide}>
+              <Text style={bannerStyles.bannerLine1}>{b.title}</Text>
+              <Text style={bannerStyles.bannerLine2}>{b.title2}</Text>
+            </View>
+            {/* Right decoration */}
+            <Text style={bannerStyles.rightDeco}>{b.rightEmoji}</Text>
           </View>
         ))}
       </ScrollView>
@@ -82,19 +94,24 @@ function BannerCarousel() {
 }
 
 const bannerStyles = StyleSheet.create({
-  wrap: { marginHorizontal: Spacing.lg, borderRadius: Radius.lg, overflow: 'hidden', marginBottom: Spacing.xl },
+  wrap: { marginHorizontal: Spacing.lg, borderRadius: Radius.xl, overflow: 'hidden', marginBottom: Spacing.xl },
   slide: {
-    width: SW - Spacing.lg * 2,
-    height: 120,
+    width: BANNER_W,
+    height: 148,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
-    gap: Spacing.lg,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.xl,
+    overflow: 'hidden',
   },
-  emoji: { fontSize: 52 },
-  title: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: Colors.textPrimary, letterSpacing: -0.3 },
-  sub: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary },
+  clusterWrap: { width: 118, height: 148, position: 'relative' },
+  ce0: { position: 'absolute', fontSize: 50, left: 6,  top: 8  },
+  ce1: { position: 'absolute', fontSize: 38, left: 52, top: 36 },
+  ce2: { position: 'absolute', fontSize: 30, left: 10, top: 74 },
+  ce3: { position: 'absolute', fontSize: 34, left: 58, top: 6  },
+  textSide: { flex: 1, justifyContent: 'center', paddingLeft: 4 },
+  bannerLine1: { fontFamily: FontFamily.bold, fontSize: 26, color: Colors.textPrimary, letterSpacing: -0.5 },
+  bannerLine2: { fontFamily: FontFamily.bold, fontSize: 26, color: Colors.textPrimary, letterSpacing: -0.5 },
+  rightDeco: { fontSize: 52, marginRight: 10 },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: Spacing.sm },
   dot: { width: 6, height: 6, borderRadius: 999, backgroundColor: Colors.border },
   dotActive: { backgroundColor: Colors.primary, width: 16 },
@@ -130,12 +147,13 @@ export default function HomeScreen() {
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
   useEffect(() => {
+    // Market rates come from the market_rates table (daily Rythu Bazar wholesale prices)
+    api.get<ApiProduct[]>('/api/market-rates?limit=500')
+      .then(data => setRates(data.map(apiToRate)))
+      .catch(() => {});
+    // Shop products come from the products table (orderable items)
     api.get<ApiProduct[]>('/api/products?limit=200')
-      .then(data => {
-        const active = data.filter(p => p.is_active);
-        setRates(active.map(apiToRate));
-        setAllProducts(active.map(apiToShop));
-      })
+      .then(data => setAllProducts(data.filter(p => p.is_active).map(apiToShop)))
       .catch(() => {});
   }, []);
 
@@ -215,7 +233,7 @@ export default function HomeScreen() {
           showsHorizontalScrollIndicator={false}
           keyExtractor={i => i.id}
           contentContainerStyle={{ paddingHorizontal: Spacing.lg, gap: Spacing.md, paddingBottom: Spacing.sm }}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <Pressable
               style={rateCard.card}
               onPress={() => guard({ type: 'TOGGLE_FAVOURITE', payload: item.id, returnTo: '/(tabs)/home' }, () => toggle(item.id))}
@@ -227,7 +245,7 @@ export default function HomeScreen() {
                   color={ids.includes(item.id) ? Colors.danger : Colors.textMuted}
                 />
               </Pressable>
-              <View style={rateCard.emojiCircle}>
+              <View style={[rateCard.emojiCircle, { backgroundColor: RATE_CIRCLE_COLORS[index % RATE_CIRCLE_COLORS.length] }]}>
                 <Text style={rateCard.emoji}>{item.emoji}</Text>
               </View>
               <Text style={rateCard.name}>{item.name}</Text>
@@ -257,10 +275,7 @@ export default function HomeScreen() {
                     <Text style={favStyles.name}>{r.name}</Text>
                     <Text style={favStyles.te}>{r.te}</Text>
                   </View>
-                  <View style={favStyles.priceWrap}>
-                    <Text style={favStyles.price}>₹{r.today}/{r.unit}</Text>
-                    <Badge chg={r.chg} />
-                  </View>
+                  <Text style={favStyles.price}>₹{r.today}/{r.unit}</Text>
                 </View>
               </View>
             ))}
@@ -278,14 +293,14 @@ export default function HomeScreen() {
           columnWrapperStyle={{ gap: Spacing.md, paddingHorizontal: Spacing.lg }}
           contentContainerStyle={{ gap: Spacing.md }}
           renderItem={({ item }) => (
-            <Pressable style={prodCard.card} onPress={() => router.push('/shop-details' as any)}>
+            <Pressable style={prodCard.card} onPress={() => router.push({ pathname: '/shop-details', params: { id: item.id } } as any)}>
               <View style={prodCard.photoArea}>
                 <Text style={prodCard.emoji}>{item.emoji}</Text>
               </View>
               <View style={prodCard.info}>
                 <Text style={prodCard.name}>{item.name}</Text>
                 <Text style={prodCard.te}>{item.te}</Text>
-                <Text style={prodCard.weight}>{item.weight}</Text>
+                <Text style={prodCard.unit}>{item.unit}</Text>
                 <View style={prodCard.footer}>
                   <View style={prodCard.priceRow}>
                     <Text style={prodCard.price}>₹{item.price}</Text>
@@ -294,8 +309,8 @@ export default function HomeScreen() {
                   <Pressable
                     style={prodCard.addBtn}
                     onPress={() => guard(
-                      { type: 'ADD_TO_CART', payload: { id: item.id, name: item.name, te: item.te, emoji: item.emoji, price: item.price, weight: item.weight, quantity: 1 }, returnTo: '/(tabs)/home' },
-                      () => addItem({ id: item.id, name: item.name, te: item.te, emoji: item.emoji, price: item.price, weight: item.weight, quantity: 1 })
+                      { type: 'ADD_TO_CART', payload: { id: item.id, name: item.name, te: item.te, emoji: item.emoji, price: item.price, unit: item.unit, quantity: 1 }, returnTo: '/(tabs)/home' },
+                      () => addItem({ id: item.id, name: item.name, te: item.te, emoji: item.emoji, price: item.price, unit: item.unit, quantity: 1 })
                     )}
                   >
                     <Text style={prodCard.addText}>Add</Text>
@@ -373,7 +388,7 @@ export default function HomeScreen() {
 const rateCard = StyleSheet.create({
   card: { width: 120, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, ...Shadow.sm },
   heart: { alignSelf: 'flex-end', marginBottom: Spacing.xs },
-  emojiCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: Spacing.sm },
+  emojiCircle: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: Spacing.sm },
   emoji: { fontSize: 30 },
   name: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
   te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.xs },
@@ -389,18 +404,17 @@ const favStyles = StyleSheet.create({
   emoji: { fontSize: 22 },
   name: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
   te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted },
-  priceWrap: { alignItems: 'flex-end', gap: 4 },
-  price: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary },
+  price: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary, marginLeft: 'auto' },
 });
 
 const prodCard = StyleSheet.create({
   card: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm },
-  photoArea: { height: 120, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center' },
-  emoji: { fontSize: 50 },
+  photoArea: { height: 130, backgroundColor: '#F5F5F0', alignItems: 'center', justifyContent: 'center' },
+  emoji: { fontSize: 62 },
   info: { padding: Spacing.md },
   name: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary, marginBottom: 2 },
   te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: 2 },
-  weight: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.sm },
+  unit: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.sm },
   footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
   price: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary },

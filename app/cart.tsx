@@ -21,7 +21,7 @@ function CartItemRow({ item }: { item: CartItem }) {
       </View>
       <View style={itemStyles.info}>
         <Text style={itemStyles.name}>{item.name}</Text>
-        <Text style={itemStyles.weight}>{item.weight}</Text>
+        <Text style={itemStyles.unit}>{item.unit}</Text>
         <Text style={itemStyles.price}>₹{item.price}</Text>
       </View>
       {/* Trash + stepper stacked on right */}
@@ -55,7 +55,7 @@ const itemStyles = StyleSheet.create({
   emoji: { fontSize: 34 },
   info: { flex: 1 },
   name: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
-  weight: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: 4 },
+  unit: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: 4 },
   price: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.primary },
   rightCol: { alignItems: 'flex-end', justifyContent: 'space-between', gap: Spacing.md },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },

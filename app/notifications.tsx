@@ -107,7 +107,7 @@ export default function NotificationsScreen() {
   useEffect(() => {
     Promise.all([
       api.get<ApiOrder[]>('/api/orders/my').catch(() => [] as ApiOrder[]),
-      api.get<ApiProduct[]>('/api/products?limit=50').catch(() => [] as ApiProduct[]),
+      api.get<ApiProduct[]>('/api/market-rates?limit=50').catch(() => [] as ApiProduct[]),
     ]).then(([orders, products]) => {
       setNotifs(buildNotifications(orders, products));
     }).finally(() => setLoading(false));
