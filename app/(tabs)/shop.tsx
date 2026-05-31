@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, TextInput, ActivityIndicator, ScrollView } from 'react-native';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius, Shadow } from '../../constants/spacing';
-import { api, ApiProduct } from '../../lib/api';
+import { api, ApiProduct, imgUrl } from '../../lib/api';
 import { useCart, useItemQuantity } from '../../hooks/useCart';
 import { useAuthGuard } from '../../hooks/useAuthGuard';
 import Chip from '../../components/ui/Chip';
@@ -46,112 +47,87 @@ function toProduct(p: ApiProduct): Product {
     te:        p.telugu_name || '',
     emoji:     p.emoji || '🥦',
     cat:       toCat(p.category_name),
-    price:     p.price,
-    orig:      p.previous_price,
+    price:     Math.round(p.price),
+    orig:      Math.round(p.previous_price),
     unit:      p.unit,
     eta:       '45 min',
     discount,
-    image_url: p.image_url,
+    image_url: imgUrl(p.image_url),
   };
 }
 
 type ShopCat = 'all' | 'vegetables' | 'fruits' | 'leafy' | 'combos';
 const CATS: { key: ShopCat; label: string }[] = [
-  { key: 'all', label: 'All' },
+  { key: 'all',        label: 'All' },
   { key: 'vegetables', label: 'Vegetables' },
-  { key: 'fruits', label: 'Fruits' },
-  { key: 'leafy', label: 'Leafy' },
-  { key: 'combos', label: 'Combos' },
+  { key: 'fruits',     label: 'Fruits' },
+  { key: 'combos',     label: 'Combos' },
 ];
+
+const BTN_W = 72;
 
 function AddStepper({ product }: { product: Product }) {
   const { addItem, increase, decrease } = useCart();
   const { guard } = useAuthGuard();
   const qty = useItemQuantity(product.id);
-  const width = useSharedValue(qty > 0 ? 88 : 64);
-
-  const animStyle = useAnimatedStyle(() => ({ width: width.value }));
 
   const handleAdd = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     guard(
       { type: 'ADD_TO_CART', payload: { id: product.id, name: product.name, te: product.te, emoji: product.emoji, price: product.price, unit: product.unit, quantity: 1 }, returnTo: '/(tabs)/shop' },
-      () => {
-        addItem({ id: product.id, name: product.name, te: product.te, emoji: product.emoji, price: product.price, unit: product.unit, quantity: 1 });
-        width.value = withSpring(88);
-      }
+      () => addItem({ id: product.id, name: product.name, te: product.te, emoji: product.emoji, price: product.price, unit: product.unit, quantity: 1 })
     );
-  };
-
-  const handleIncrease = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    increase(product.id);
-  };
-
-  const handleDecrease = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    decrease(product.id);
-    if (qty <= 1) width.value = withSpring(64);
   };
 
   if (qty === 0) {
     return (
-      <Animated.View style={[stepperStyles.addBtn, animStyle]}>
-        <Pressable onPress={handleAdd} style={stepperStyles.addPressable}>
-          <Text style={stepperStyles.addText}>Add</Text>
-        </Pressable>
-      </Animated.View>
+      <Pressable style={stepperStyles.addBtn} onPress={handleAdd}>
+        <Text style={stepperStyles.addText}>Add</Text>
+      </Pressable>
     );
   }
 
   return (
-    <Animated.View style={[stepperStyles.stepper, animStyle]}>
-      <Pressable onPress={handleDecrease} style={stepperStyles.stepBtn}>
+    <View style={stepperStyles.stepper}>
+      <Pressable style={stepperStyles.stepBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); decrease(product.id); }}>
         <Text style={stepperStyles.stepIcon}>−</Text>
       </Pressable>
-      <Text style={stepperStyles.qty}>+{qty}</Text>
-      <Pressable onPress={handleIncrease} style={stepperStyles.stepBtn}>
+      <Text style={stepperStyles.qty}>{qty}</Text>
+      <Pressable style={stepperStyles.stepBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); increase(product.id); }}>
         <Text style={stepperStyles.stepIcon}>+</Text>
       </Pressable>
-    </Animated.View>
+    </View>
   );
 }
 
 const stepperStyles = StyleSheet.create({
-  addBtn: { height: 36, backgroundColor: Colors.primary, borderRadius: Radius.full, overflow: 'hidden' },
-  addPressable: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  addBtn: { width: BTN_W, height: 36, backgroundColor: Colors.primaryDark, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center' },
   addText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textInverse },
-  stepper: { height: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.primary, overflow: 'hidden', paddingHorizontal: 2 },
-  stepBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
-  stepIcon: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.primary },
-  qty: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.primary },
+  stepper: { width: BTN_W, height: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: Radius.lg, borderWidth: 1.5, borderColor: Colors.primaryDark, paddingHorizontal: 2 },
+  stepBtn: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
+  stepIcon: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.primaryDark },
+  qty: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.primaryDark },
 });
 
 function ProductCard({ item }: { item: Product }) {
   return (
     <Pressable style={prodStyles.card} onPress={() => router.push({ pathname: '/shop-details', params: { id: item.id } } as any)}>
-      {/* Photo area */}
-      <View style={prodStyles.photoArea}>
-        <View style={prodStyles.vvBadge}><Text style={prodStyles.vvText}>VV</Text></View>
-        {item.discount > 0 && (
-          <View style={prodStyles.discountBadge}>
-            <Text style={prodStyles.discountText}>{item.discount}% off</Text>
-          </View>
-        )}
-        <Text style={prodStyles.emoji}>{item.emoji}</Text>
-      </View>
-      {/* Info area */}
-      <View style={prodStyles.info}>
-        <Text style={prodStyles.name}>{item.name}</Text>
-        <Text style={prodStyles.te}>{item.te}</Text>
-        <View style={prodStyles.unitRow}>
-          <Text style={prodStyles.unit}>{item.unit}</Text>
-          <View style={prodStyles.etaChip}><Text style={prodStyles.etaText}>🕐 {item.eta}</Text></View>
+      {item.image_url ? (
+        <Image source={{ uri: item.image_url }} style={prodStyles.photo} contentFit="cover" />
+      ) : (
+        <View style={prodStyles.photoFallback}>
+          <Text style={prodStyles.emoji}>{item.emoji}</Text>
         </View>
+      )}
+      <View style={prodStyles.info}>
+        <Text style={prodStyles.name} numberOfLines={1}>{item.name}</Text>
+        <Text style={prodStyles.unit}>{item.unit}</Text>
         <View style={prodStyles.footer}>
           <View style={prodStyles.priceRow}>
             <Text style={prodStyles.price}>₹{item.price}</Text>
-            <Text style={prodStyles.orig}>₹{item.orig}</Text>
+            {item.orig > item.price && (
+              <Text style={prodStyles.orig}>₹{item.orig}</Text>
+            )}
           </View>
           <AddStepper product={item} />
         </View>
@@ -161,31 +137,24 @@ function ProductCard({ item }: { item: Product }) {
 }
 
 const prodStyles = StyleSheet.create({
-  card: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm },
-  photoArea: { height: 140, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  vvBadge: { position: 'absolute', top: Spacing.sm, left: Spacing.sm, backgroundColor: Colors.primary, borderRadius: Radius.sm, paddingHorizontal: Spacing.xs, paddingVertical: 2, zIndex: 1 },
-  vvText: { fontFamily: FontFamily.bold, fontSize: 9, color: Colors.textInverse },
-  discountBadge: { position: 'absolute', top: Spacing.sm, right: Spacing.sm, backgroundColor: Colors.danger, borderRadius: Radius.full, paddingHorizontal: Spacing.xs, paddingVertical: 2, zIndex: 1 },
-  discountText: { fontFamily: FontFamily.bold, fontSize: 9, color: Colors.textInverse },
+  card: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.md },
+  photo: { width: '100%', height: 155 },
+  photoFallback: { width: '100%', height: 155, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center' },
   emoji: { fontSize: 56 },
-  info: { padding: Spacing.md },
-  name: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary, marginBottom: 2 },
-  te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.xs },
-  unitRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
+  info: { padding: 10, gap: Spacing.xs },
+  name: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary },
   unit: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted },
-  etaChip: { backgroundColor: Colors.primaryPale, borderRadius: Radius.full, paddingHorizontal: Spacing.xs, paddingVertical: 2 },
-  etaText: { fontFamily: FontFamily.regular, fontSize: 9, color: Colors.primary },
-  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.sm },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
-  price: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary },
+  price: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
   orig: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, textDecorationLine: 'line-through' },
 });
 
 export default function ShopScreen() {
-  const [cat, setCat]         = useState<ShopCat>('all');
-  const [query, setQuery]     = useState('');
+  const [cat, setCat]           = useState<ShopCat>('all');
+  const [query, setQuery]       = useState('');
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]   = useState(true);
   const { count } = useCart();
 
   useEffect(() => {
@@ -197,7 +166,7 @@ export default function ShopScreen() {
 
   const filtered = products.filter((p: Product) => {
     const matchCat = cat === 'all' || p.cat === cat;
-    const matchQ = p.name.toLowerCase().includes(query.toLowerCase());
+    const matchQ   = p.name.toLowerCase().includes(query.toLowerCase());
     return matchCat && matchQ;
   });
 
@@ -205,7 +174,7 @@ export default function ShopScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="light" />
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color={Colors.primaryDark} />
       </View>
     </SafeAreaView>
   );
@@ -214,21 +183,26 @@ export default function ShopScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="light" />
 
-      <View style={styles.header}>
+      <LinearGradient
+        colors={['#1B5E35', '#4CAF6F']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.4, y: 1 }}
+        style={styles.header}
+      >
         <Text style={styles.title}>Shopping</Text>
         <View style={styles.searchRow}>
           <View style={styles.searchBar}>
-            <Ionicons name="search-outline" size={16} color={Colors.primary} />
+            <Ionicons name="search-outline" size={18} color={Colors.primaryDark} />
             <TextInput
               style={styles.searchInput}
               placeholder="Search for vegetables, fruits..."
-              placeholderTextColor={Colors.primary}
+              placeholderTextColor={Colors.primaryDark}
               value={query}
               onChangeText={setQuery}
             />
           </View>
           <Pressable style={styles.cartBtn} onPress={() => router.push('/cart' as any)}>
-            <Ionicons name="cart-outline" size={22} color={Colors.primary} />
+            <Ionicons name="cart-outline" size={24} color={Colors.primaryDark} />
             {count > 0 && (
               <View style={styles.cartBadge}>
                 <Text style={styles.cartBadgeText}>{count > 9 ? '9+' : count}</Text>
@@ -236,25 +210,26 @@ export default function ShopScreen() {
             )}
           </Pressable>
         </View>
-      </View>
+      </LinearGradient>
 
-      <View style={styles.verifiedBanner}>
-        <Ionicons name="checkmark-circle" size={16} color={Colors.primary} />
-        <Text style={styles.verifiedText}>All products by Vizag Vegetables</Text>
-      </View>
-
-      <View style={styles.chipsRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.chipsRow}
+        contentContainerStyle={styles.chipsContent}
+      >
         {CATS.map(c => (
           <Chip key={c.key} label={c.label} active={cat === c.key} onPress={() => setCat(c.key)} />
         ))}
-      </View>
+      </ScrollView>
 
       <FlatList
         data={filtered}
         numColumns={2}
         keyExtractor={i => i.id}
-        columnWrapperStyle={{ gap: Spacing.md, paddingHorizontal: Spacing.xxl }}
-        contentContainerStyle={{ gap: Spacing.md, paddingTop: Spacing.md, paddingBottom: 100 }}
+        showsVerticalScrollIndicator={false}
+        columnWrapperStyle={{ gap: Spacing.sm, paddingHorizontal: Spacing.md }}
+        contentContainerStyle={{ gap: Spacing.md, paddingTop: Spacing.sm, paddingBottom: 100 }}
         renderItem={({ item }) => <ProductCard item={item} />}
       />
     </SafeAreaView>
@@ -263,15 +238,21 @@ export default function ShopScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { backgroundColor: Colors.primary, paddingHorizontal: Spacing.xxl, paddingBottom: Spacing.lg },
-  title: { fontFamily: FontFamily.bold, fontSize: FontSize.xxl, color: Colors.textInverse, letterSpacing: -0.3, marginBottom: Spacing.md },
+  header: {
+    paddingHorizontal: Spacing.xxl,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xl,
+    borderBottomLeftRadius: Radius.xl,
+    borderBottomRightRadius: Radius.xl,
+    overflow: 'hidden',
+  },
+  title: { fontFamily: FontFamily.bold, fontSize: FontSize.xxxl, color: Colors.textInverse, letterSpacing: -0.5, marginBottom: Spacing.md },
   searchRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
   searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: Spacing.sm },
-  searchInput: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.primary, padding: 0, outlineStyle: 'none' } as any,
-  cartBtn: { width: 44, height: 44, borderRadius: Radius.full, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  cartBadge: { position: 'absolute', top: -2, right: -2, backgroundColor: Colors.danger, borderRadius: 999, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  searchInput: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textPrimary, padding: 0, outlineStyle: 'none' } as any,
+  cartBtn: { width: 48, height: 48, borderRadius: Radius.full, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
+  cartBadge: { position: 'absolute', top: 0, right: 0, backgroundColor: Colors.danger, borderRadius: 999, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   cartBadgeText: { fontFamily: FontFamily.bold, fontSize: 9, color: Colors.textInverse },
-  verifiedBanner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, backgroundColor: Colors.primaryPale, paddingHorizontal: Spacing.xxl, paddingVertical: Spacing.sm },
-  verifiedText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary },
-  chipsRow: { flexDirection: 'row', paddingHorizontal: Spacing.xxl, paddingVertical: Spacing.sm, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  chipsRow: { backgroundColor: Colors.background, maxHeight: 60 },
+  chipsContent: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, alignItems: 'center' },
 });

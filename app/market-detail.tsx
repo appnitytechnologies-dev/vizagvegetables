@@ -1,43 +1,86 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
+import * as Location from 'expo-location';
+import LeafletMap from '../components/ui/LeafletMap';
+import { api, marketApi, ApiProduct, ApiMarket } from '../lib/api';
+import { haversineKm, formatKm } from '../utils/distance';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
-import { api, ApiProduct } from '../lib/api';
 
-/* ── Inline static market data ──────────────────────────────── */
-interface Market {
-  id: string; name: string; area: string; km: number; vendors: number;
-  opens: string; closes: string; openHour: number; closeHour: number; days: string;
+function buildDetailMapHtml(m: ApiMarket): string {
+  if (!m.lat || !m.lng) return '<html><body style="background:#f0f0f0"></body></html>';
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden}
+#map{width:100%;height:100%}
+.leaflet-control-attribution{display:none}
+.mpin{width:26px;height:26px;background:#2E7D32;border:3px solid #fff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 3px 8px rgba(0,0,0,.4)}
+.leaflet-tooltip{background:#2E7D32;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;padding:4px 10px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.leaflet-tooltip::before{border-top-color:#2E7D32}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+var map=L.map('map',{zoomControl:false,dragging:false,scrollWheelZoom:false}).setView([${m.lat},${m.lng}],15);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+var pin=L.divIcon({className:'',html:'<div class="mpin"></div>',iconSize:[26,26],iconAnchor:[13,26],popupAnchor:[0,-30]});
+L.marker([${m.lat},${m.lng}],{icon:pin}).addTo(map)
+  .bindTooltip('${m.name}',{permanent:true,direction:'top',offset:[0,-10]});
+</script>
+</body>
+</html>`;
 }
 
-const MARKETS: Record<string, Market> = {
-  '1': { id: '1', name: 'MVP Colony Rythu Bazar',  area: 'MVP Colony',    km: 1.2, vendors: 45, opens: '6:00 AM',  closes: '1:00 PM',  openHour: 6,   closeHour: 13,   days: 'Mon–Sat' },
-  '2': { id: '2', name: 'Jagadamba Rythu Bazar',   area: 'Jagadamba',     km: 2.8, vendors: 62, opens: '5:30 AM',  closes: '12:00 PM', openHour: 5.5, closeHour: 12,   days: 'Daily'   },
-  '3': { id: '3', name: 'Gajuwaka Rythu Bazar',    area: 'Gajuwaka',      km: 4.5, vendors: 38, opens: '6:00 AM',  closes: '1:00 PM',  openHour: 6,   closeHour: 13,   days: 'Mon–Sat' },
-  '4': { id: '4', name: 'Dwaraka Nagar Bazar',     area: 'Dwaraka Nagar', km: 3.1, vendors: 28, opens: '6:30 AM',  closes: '12:30 PM', openHour: 6.5, closeHour: 12.5, days: 'Daily'   },
-};
+function isOpen(m: ApiMarket) {
+  if (!m.open_hour || !m.close_hour) return false;
+  const h = new Date().getHours() + new Date().getMinutes() / 60;
+  return h >= m.open_hour && h < m.close_hour;
+}
 
 const TABS = ["Today's Prices", 'About', 'Photos'];
 const PRODUCE_EMOJIS = ['🥦','🍅','🧅','🥕','🌽','🍆','🌿','🥒','🫑','🍌','🧄','🫛'];
 
-function isOpen(m: Market) {
-  const h = new Date().getHours() + new Date().getMinutes() / 60;
-  return h >= m.openHour && h < m.closeHour;
-}
-
 export default function MarketDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const market  = MARKETS[id ?? '1'] ?? MARKETS['1'];
-  const open    = isOpen(market);
 
-  const [activeTab, setActiveTab]   = useState(0);
-  const [products,  setProducts]    = useState<ApiProduct[]>([]);
+  const [market,        setMarket]        = useState<ApiMarket | null>(null);
+  const [activeTab,     setActiveTab]     = useState(0);
+  const [products,      setProducts]      = useState<ApiProduct[]>([]);
+  const [loadingMarket, setLoadingMarket] = useState(true);
   const [loadingPrices, setLoadingPrices] = useState(false);
+  const [userLocation,  setUserLocation]  = useState<{ lat: number; lng: number } | null>(null);
+
+  // Get real GPS location
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!id) return;
+    setLoadingMarket(true);
+    marketApi.getById(id)
+      .then(setMarket)
+      .catch(() => {})
+      .finally(() => setLoadingMarket(false));
+  }, [id]);
 
   useEffect(() => {
     if (activeTab !== 0) return;
@@ -47,6 +90,18 @@ export default function MarketDetail() {
       .catch(() => {})
       .finally(() => setLoadingPrices(false));
   }, [activeTab]);
+
+  if (loadingMarket || !market) {
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={Colors.primary} size="large" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const open = isOpen(market);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -74,15 +129,41 @@ export default function MarketDetail() {
         {/* Stats strip */}
         <View style={styles.statsStrip}>
           {[
-            { icon: 'location-outline', val: `${market.km} km` },
-            { icon: 'time-outline',     val: market.opens },
-            { icon: 'people-outline',   val: `${market.vendors} vendors` },
+            {
+              icon: 'location-outline',
+              val: userLocation && market.lat && market.lng
+                ? formatKm(haversineKm(userLocation.lat, userLocation.lng, market.lat, market.lng))
+                : market.distance_km ? `${market.distance_km} km` : '—',
+            },
+            { icon: 'time-outline',   val: market.opens ?? '—' },
+            { icon: 'people-outline', val: `${market.vendors_count} vendors` },
           ].map(s => (
             <View key={s.icon} style={styles.statItem}>
               <Ionicons name={s.icon as any} size={16} color={Colors.primary} />
               <Text style={styles.statVal}>{s.val}</Text>
             </View>
           ))}
+        </View>
+
+        {/* Location map */}
+        <View style={styles.mapCard}>
+          <LeafletMap html={buildDetailMapHtml(market)} style={styles.mapView} />
+          <View style={styles.mapFooter}>
+            <View style={styles.mapInfo}>
+              <Ionicons name="location-sharp" size={15} color={Colors.primary} />
+              <View>
+                <Text style={styles.mapTitle}>{market.name}</Text>
+                <Text style={styles.mapAddr}>{market.address}</Text>
+              </View>
+            </View>
+            <Pressable
+              style={styles.directionsBtn}
+              onPress={() => Linking.openURL(`https://maps.google.com/?q=${market.lat},${market.lng}`)}
+            >
+              <Ionicons name="navigate-outline" size={14} color={Colors.textInverse} />
+              <Text style={styles.directionsTxt}>Directions</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* Tabs */}
@@ -138,13 +219,20 @@ export default function MarketDetail() {
             <View style={styles.sep} />
             <View style={styles.aboutRow}><Text style={styles.aboutKey}>Days</Text><Text style={styles.aboutVal}>{market.days}</Text></View>
             <View style={styles.sep} />
-            <View style={styles.aboutRow}><Text style={styles.aboutKey}>Vendors</Text><Text style={styles.aboutVal}>{market.vendors}</Text></View>
+            <View style={styles.aboutRow}><Text style={styles.aboutKey}>Vendors</Text><Text style={styles.aboutVal}>{market.vendors_count}</Text></View>
             <View style={styles.sep} />
-            <View style={styles.aboutRow}><Text style={styles.aboutKey}>Distance</Text><Text style={styles.aboutVal}>{market.km} km from city centre</Text></View>
+            <View style={styles.aboutRow}>
+              <Text style={styles.aboutKey}>Distance</Text>
+              <Text style={styles.aboutVal}>
+                {userLocation && market.lat && market.lng
+                  ? `${formatKm(haversineKm(userLocation.lat, userLocation.lng, market.lat, market.lng))} from you`
+                  : market.distance_km ? `${market.distance_km} km from city centre` : '—'}
+              </Text>
+            </View>
             <View style={styles.sep} />
             <Text style={[styles.aboutKey, { padding: Spacing.md }]}>Facilities</Text>
             <View style={styles.chipsRow}>
-              {['Parking', 'Restrooms', 'ATM Nearby', 'Bus Stop'].map(f => (
+              {(market.facilities ?? []).map(f => (
                 <View key={f} style={styles.facilityChip}>
                   <Text style={styles.facilityText}>{f}</Text>
                 </View>
@@ -188,7 +276,7 @@ const styles = StyleSheet.create({
 
   tabRow: { flexDirection: 'row', marginHorizontal: Spacing.xxl, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 4, ...Shadow.sm, marginBottom: Spacing.lg },
   tab: { flex: 1, paddingVertical: Spacing.sm, alignItems: 'center', borderRadius: Radius.md },
-  tabActive: { backgroundColor: Colors.primary },
+  tabActive: { backgroundColor: Colors.primaryDark },
   tabLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textMuted },
   tabLabelActive: { color: Colors.textInverse, fontFamily: FontFamily.semiBold },
 
@@ -222,4 +310,13 @@ const styles = StyleSheet.create({
   photosGrid: { marginHorizontal: Spacing.xxl, flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   photoCell: { width: '31.5%', aspectRatio: 1, backgroundColor: Colors.primaryPale, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
   photoEmoji: { fontSize: 40 },
+
+  mapCard: { marginHorizontal: Spacing.xxl, marginBottom: Spacing.lg, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm, height: 230, backgroundColor: Colors.surface },
+  mapView: { flex: 1 },
+  mapFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: Spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border, backgroundColor: Colors.surface },
+  mapInfo: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.xs, flex: 1 },
+  mapTitle: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
+  mapAddr: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 1 },
+  directionsBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, backgroundColor: Colors.primaryDark, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
+  directionsTxt: { fontFamily: FontFamily.semiBold, fontSize: FontSize.xs, color: Colors.textInverse },
 });

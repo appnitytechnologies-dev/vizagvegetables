@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Share, ActivityIndicator, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, Pressable, ScrollView, Share, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { Image } from 'expo-image';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -9,22 +10,23 @@ import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
 import { api, ApiProduct, imgUrl } from '../lib/api';
-import { useCart, useItemQuantity } from '../hooks/useCart';
-import { useFavourites } from '../hooks/useFavourites';
+import { useCart } from '../hooks/useCart';
 import { useAuthGuard } from '../hooks/useAuthGuard';
+import CartFAB from '../components/CartFAB';
 
 const QTY_OPTIONS = [1, 2, 5, 10];
 
 export default function ShopDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [product, setProduct] = useState<ApiProduct | null>(null);
-  const [loading, setLoading]  = useState(true);
+  const [product, setProduct]     = useState<ApiProduct | null>(null);
+  const [loading, setLoading]     = useState(true);
   const [selectedQty, setSelectedQty] = useState(1);
-  const { addItem, increase, decrease } = useCart();
-  const cartQty = useItemQuantity(id || '');
-  const { ids, toggle } = useFavourites();
+  const [added, setAdded]         = useState(false);
+  const { addItem } = useCart();
   const { guard } = useAuthGuard();
-  const isFav = id ? ids.includes(id) : false;
+  const insets = useSafeAreaInsets();
+  const { height: screenH } = useWindowDimensions();
+  const HERO_H = screenH * 0.50;
 
   useEffect(() => {
     if (!id) { setLoading(false); return; }
@@ -46,104 +48,108 @@ export default function ShopDetails() {
   const handleAddToCart = () => {
     if (!product) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    addItem({
-      id: product.id,
-      name: product.name,
-      te: product.telugu_name || '',
-      emoji: product.emoji || '🥦',
-      price: product.price,
-      unit: product.unit,
-      quantity: selectedQty,
-    });
+    guard(
+      { type: 'ADD_TO_CART', payload: { id: product.id, name: product.name, te: product.telugu_name || '', emoji: product.emoji || '🥦', price: product.price, unit: product.unit, quantity: selectedQty }, returnTo: '/shop-details' },
+      () => {
+        addItem({ id: product.id, name: product.name, te: product.telugu_name || '', emoji: product.emoji || '🥦', price: product.price, unit: product.unit, quantity: selectedQty });
+        setAdded(true);
+        setTimeout(() => setAdded(false), 1800);
+      }
+    );
   };
 
+  const topBtnStyle = { top: insets.top + Spacing.md };
+
   if (loading) return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <StatusBar style="dark" />
-      <Pressable style={[styles.iconBtn, { left: Spacing.lg, top: Spacing.lg + 44 }]} onPress={() => router.back()}>
-        <Ionicons name="chevron-back" size={20} color={Colors.textPrimary} />
-      </Pressable>
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    </SafeAreaView>
+    <View style={styles.centered}>
+      <StatusBar style="light" />
+      <ActivityIndicator size="large" color={Colors.primaryDark} />
+    </View>
   );
 
   if (!product) return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <View style={styles.centered}>
       <StatusBar style="dark" />
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md }}>
-        <Text style={{ fontSize: 48 }}>😕</Text>
-        <Text style={{ fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary }}>Product not found</Text>
-        <Pressable onPress={() => router.back()}><Text style={{ color: Colors.primary, fontFamily: FontFamily.medium }}>Go back</Text></Pressable>
-      </View>
-    </SafeAreaView>
+      <Text style={{ fontSize: 48 }}>😕</Text>
+      <Text style={{ fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary, marginTop: Spacing.md }}>Product not found</Text>
+      <Pressable onPress={() => router.back()} style={{ marginTop: Spacing.md }}>
+        <Text style={{ color: Colors.primaryDark, fontFamily: FontFamily.medium }}>Go back</Text>
+      </Pressable>
+    </View>
   );
 
   const discount = product.previous_price > product.price
     ? Math.round(((product.previous_price - product.price) / product.previous_price) * 100)
     : 0;
 
-  return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <StatusBar style="dark" />
+  const photo = imgUrl(product.image_url);
 
-      {/* Hero */}
-      <View style={styles.heroWrap}>
-        <View style={styles.hero}>
-          {imgUrl(product.image_url)
-            ? <Image source={{ uri: imgUrl(product.image_url)! }} style={styles.heroImage} resizeMode="contain" />
-            : <Text style={styles.heroEmoji}>{product.emoji || '🥦'}</Text>
-          }
-          {discount > 0 && (
-            <View style={styles.discountBadge}>
-              <Text style={styles.discountText}>{discount}% OFF</Text>
+  return (
+    <View style={styles.root}>
+      <StatusBar style="light" />
+
+      {/* ── Full-bleed hero image ── */}
+      <View style={[styles.hero, { height: HERO_H }]}>
+        {photo
+          ? <Image source={{ uri: photo }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          : <View style={[StyleSheet.absoluteFill, styles.heroFallback]}>
+              <Text style={styles.heroEmoji}>{product.emoji || '🥦'}</Text>
             </View>
-          )}
-        </View>
-        <Pressable style={[styles.iconBtn, { left: Spacing.lg }]} onPress={() => router.back()}>
+        }
+
+        {/* Dark gradient scrim — pointerEvents none so buttons behind it still work */}
+        <View style={styles.heroScrim} pointerEvents="none" />
+
+        {/* Back button */}
+        <Pressable style={[styles.iconBtn, { left: Spacing.lg }, topBtnStyle]} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={20} color={Colors.textPrimary} />
         </Pressable>
-        <View style={styles.topRight}>
-          <Pressable
-            style={styles.iconBtn}
-            onPress={() => guard(
-              { type: 'TOGGLE_FAVOURITE', payload: product.id, returnTo: '/shop-details' },
-              () => toggle(product.id)
-            )}
-          >
-            <Ionicons
-              name={isFav ? 'heart' : 'heart-outline'}
-              size={20}
-              color={isFav ? Colors.danger : Colors.textPrimary}
-            />
-          </Pressable>
-          <Pressable style={styles.iconBtn} onPress={handleShare}>
-            <Ionicons name="share-outline" size={20} color={Colors.textPrimary} />
-          </Pressable>
+
+        {/* Share button */}
+        <Pressable style={[styles.iconBtn, { right: Spacing.lg }, topBtnStyle]} onPress={handleShare}>
+          <Ionicons name="share-outline" size={20} color={Colors.textPrimary} />
+        </Pressable>
+
+        {/* Discount badge */}
+        {discount > 0 && (
+          <View style={styles.discountBadge}>
+            <Text style={styles.discountText}>{discount}% OFF</Text>
+          </View>
+        )}
+
+        {/* Dots */}
+        <View style={styles.dotsRow}>
+          <View style={[styles.dot, styles.dotActive]} />
+          <View style={styles.dot} />
+          <View style={styles.dot} />
         </View>
       </View>
 
-      {/* Bottom sheet */}
-      <ScrollView style={styles.sheet} showsVerticalScrollIndicator={false}>
-        <View style={styles.sheetHandle} />
+      {/* ── White sheet overlapping the image ── */}
+      <ScrollView
+        style={[styles.sheet, { marginTop: -Radius.xxl }]}
+        contentContainerStyle={styles.sheetContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.handle} />
 
+        {/* Name + Price row */}
         <View style={styles.nameRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.productName}>{product.name}</Text>
             {product.telugu_name ? <Text style={styles.productTe}>{product.telugu_name}</Text> : null}
-            <Text style={styles.productUnit}>per {product.unit}</Text>
+            <Text style={styles.productUnit}>{product.unit}, Price</Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={styles.price}>₹{product.price}</Text>
+            <Text style={styles.price}>₹ {product.price}</Text>
             {product.previous_price > product.price && (
               <Text style={styles.origPrice}>₹{product.previous_price}</Text>
             )}
           </View>
         </View>
 
-        {/* Quantity selector */}
-        <Text style={styles.sectionLabel}>Select Quantity</Text>
+        {/* Select Weight */}
+        <Text style={styles.sectionLabel}>Select Weight</Text>
         <View style={styles.weightRow}>
           {QTY_OPTIONS.map(q => (
             <Pressable
@@ -152,7 +158,7 @@ export default function ShopDetails() {
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedQty(q); }}
             >
               <Text style={[styles.weightText, selectedQty === q && styles.weightTextActive]}>
-                {q} {product.unit}
+                {q}{product.unit}
               </Text>
             </Pressable>
           ))}
@@ -160,85 +166,102 @@ export default function ShopDetails() {
 
         <View style={styles.divider} />
 
-        <Text style={styles.sectionLabel}>Product Detail</Text>
+        {/* Product Detail */}
+        <Text style={styles.sectionTitle}>Product Detail</Text>
         <Text style={styles.description}>
           {product.description || `Fresh ${product.name} sourced directly from Rythu Bazar farmers. Delivered the same morning they are procured.`}
         </Text>
 
-        <View style={styles.tagsRow}>
-          <View style={styles.tag}><Text style={styles.tagText}>✓ Farm Fresh</Text></View>
-          <View style={styles.tag}><Text style={styles.tagText}>✓ Daily Sourced</Text></View>
-          <View style={styles.tag}><Text style={styles.tagText}>✓ Pesticide-free</Text></View>
-          {product.category_name ? (
-            <View style={styles.tag}><Text style={styles.tagText}>✓ {product.category_name}</Text></View>
-          ) : null}
-        </View>
-
-        <View style={{ height: 100 }} />
+        <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Sticky bottom bar */}
-      <View style={styles.bottomBar}>
-        {cartQty > 0 ? (
-          <View style={styles.stepper}>
-            <Pressable style={styles.stepCircleBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); decrease(product.id); }}>
-              <Text style={styles.stepIcon}>−</Text>
-            </Pressable>
-            <View style={styles.stepQtyBox}>
-              <Text style={styles.stepQty}>{cartQty}</Text>
-            </View>
-            <Pressable style={styles.stepCircleBtn} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); increase(product.id); }}>
-              <Text style={styles.stepIcon}>+</Text>
-            </Pressable>
+      <CartFAB />
+
+      {/* ── Sticky bottom bar ── */}
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom || Spacing.lg }]}>
+        <View style={styles.stepper}>
+          <Pressable
+            style={styles.stepBtn}
+            onPress={() => { if (selectedQty > 1) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedQty(q => q - 1); } }}
+          >
+            <Text style={styles.stepIcon}>−</Text>
+          </Pressable>
+          <View style={styles.stepQtyBox}>
+            <Text style={styles.stepQty}>{selectedQty}</Text>
           </View>
-        ) : (
-          <View style={{ width: 120 }} />
-        )}
-        <Pressable style={styles.addToCartBtn} onPress={handleAddToCart}>
+          <Pressable
+            style={styles.stepBtn}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedQty(q => q + 1); }}
+          >
+            <Text style={styles.stepIcon}>+</Text>
+          </Pressable>
+        </View>
+
+        <Pressable
+          style={added ? [styles.addToCartBtn, styles.addToCartBtnAdded] : styles.addToCartBtn}
+          onPress={handleAddToCart}
+          disabled={added}
+        >
           <Text style={styles.addToCartText}>
-            Add {selectedQty} {product.unit} · ₹{product.price * selectedQty}
+            {added ? '✓  Added to Cart' : 'Add to Cart'}
           </Text>
         </Pressable>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.surface },
-  heroWrap: { height: 300, position: 'relative' },
-  hero: { height: 300, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center' },
+  root: { flex: 1, backgroundColor: Colors.surface },
+  centered: { flex: 1, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center' },
+
+  /* Hero */
+  hero: { width: '100%', backgroundColor: '#111', overflow: 'hidden' },
+  heroFallback: { backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center' },
   heroEmoji: { fontSize: 120 },
-  heroImage: { width: '80%', height: '80%' },
-  topRight: { position: 'absolute', top: Spacing.lg, right: Spacing.lg, flexDirection: 'row', gap: Spacing.sm },
-  discountBadge: { position: 'absolute', top: Spacing.lg, right: Spacing.lg, backgroundColor: Colors.danger, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
+  heroScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.08)' },
+  iconBtn: { position: 'absolute', width: 40, height: 40, borderRadius: Radius.md, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', ...Shadow.sm },
+  discountBadge: { position: 'absolute', bottom: 56, right: Spacing.lg, backgroundColor: Colors.danger, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
   discountText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.textInverse },
-  iconBtn: { position: 'absolute', top: Spacing.lg, width: 40, height: 40, borderRadius: Radius.sm, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', ...Shadow.sm },
-  sheet: { flex: 1, backgroundColor: Colors.surface, borderTopLeftRadius: Radius.xxl, borderTopRightRadius: Radius.xxl, marginTop: -Radius.xxl, paddingHorizontal: Spacing.xxl },
-  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginTop: Spacing.md, marginBottom: Spacing.lg },
+  dotsRow: { position: 'absolute', bottom: Spacing.lg, alignSelf: 'center', flexDirection: 'row', gap: 6 },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.45)' },
+  dotActive: { backgroundColor: Colors.surface },
+
+  /* Sheet */
+  sheet: { flex: 1, backgroundColor: Colors.surface, borderTopLeftRadius: Radius.xxl, borderTopRightRadius: Radius.xxl },
+  sheetContent: { paddingHorizontal: Spacing.xxl, paddingBottom: Spacing.xl },
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: 'center', marginTop: Spacing.md, marginBottom: Spacing.lg },
+
+  /* Name row */
   nameRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.xl },
-  productName: { fontFamily: FontFamily.bold, fontSize: FontSize.xxxl, color: Colors.textPrimary, letterSpacing: -0.3 },
+  productName: { fontFamily: FontFamily.bold, fontSize: FontSize.xxxl, color: Colors.textPrimary, letterSpacing: -0.5 },
   productTe: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, marginTop: 2 },
-  productUnit: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
-  price: { fontFamily: FontFamily.bold, fontSize: FontSize.xxxl, color: Colors.textPrimary, letterSpacing: -0.3 },
-  origPrice: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, textDecorationLine: 'line-through' },
-  sectionLabel: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.sm },
+  productUnit: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, marginTop: 4 },
+  price: { fontFamily: FontFamily.bold, fontSize: FontSize.xxxl, color: Colors.textPrimary, letterSpacing: -0.5 },
+  origPrice: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, textDecorationLine: 'line-through', textAlign: 'right' },
+
+  /* Quantity */
+  sectionLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.md, color: Colors.textMuted, marginBottom: Spacing.md },
   weightRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl, flexWrap: 'wrap' },
-  weightChip: { borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.sm, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm },
-  weightChipActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
+  weightChip: { borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm },
+  weightChipActive: { borderColor: Colors.primaryDark },
   weightText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
-  weightTextActive: { color: Colors.primary },
-  divider: { height: 1, backgroundColor: Colors.border, marginBottom: Spacing.xl },
-  description: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 22, marginBottom: Spacing.lg },
-  tagsRow: { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' },
-  tag: { backgroundColor: Colors.primaryPale, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
-  tagText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.primary },
-  bottomBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.xxl, paddingVertical: Spacing.lg, backgroundColor: Colors.surface, borderTopWidth: 1, borderTopColor: Colors.border, gap: Spacing.md },
+  weightTextActive: { color: Colors.primaryDark },
+
+  divider: { height: 1, backgroundColor: Colors.border, marginBottom: Spacing.lg },
+
+  /* Product detail */
+  sectionTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary, marginBottom: Spacing.sm },
+  description: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, lineHeight: 22 },
+
+  /* Bottom bar */
+  bottomBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.xxl, paddingTop: Spacing.lg, backgroundColor: Colors.surface, gap: Spacing.md },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  stepCircleBtn: { width: 36, height: 36, borderRadius: Radius.full, borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
-  stepQtyBox: { width: 40, height: 36, borderRadius: Radius.sm, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  stepIcon: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.primary },
-  stepQty: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
-  addToCartBtn: { flex: 1, backgroundColor: Colors.primary, borderRadius: Radius.full, paddingVertical: Spacing.lg, alignItems: 'center' },
+  stepBtn: { width: 40, height: 40, borderRadius: Radius.md, borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
+  stepIcon: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
+  stepQtyBox: { width: 44, height: 40, borderRadius: Radius.md, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  stepQty: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.primaryDark },
+  addToCartBtn: { flex: 1, backgroundColor: Colors.primaryDark, borderRadius: Radius.full, paddingVertical: Spacing.lg, alignItems: 'center', ...Shadow.sm },
+  addToCartBtnAdded: { backgroundColor: Colors.success },
   addToCartText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.md, color: Colors.textInverse },
 });

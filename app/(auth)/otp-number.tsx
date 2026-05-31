@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
 import { useDispatch } from 'react-redux';
+import { AntDesign } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius, Shadow } from '../../constants/spacing';
@@ -70,9 +71,7 @@ export default function OtpNumber() {
       <StatusBar style="light" />
 
       <View style={styles.greenTop}>
-        <View style={styles.illustrationWrap}>
-          <Text style={styles.illustrationEmoji}>🛒👨‍👩‍👧‍👦</Text>
-        </View>
+        <Text style={styles.illustration}>🧑‍🤝‍🧑🛒</Text>
       </View>
 
       <KeyboardAvoidingView
@@ -83,7 +82,7 @@ export default function OtpNumber() {
           contentContainerStyle={styles.bottomCard}
           keyboardShouldPersistTaps="handled"
         >
-          {/* ── Login / Sign Up toggle ── */}
+          {/* Login / Sign Up toggle */}
           <View style={styles.modeToggle}>
             <Pressable
               style={[styles.modeBtn, mode === 'login' && styles.modeBtnActive]}
@@ -112,7 +111,7 @@ export default function OtpNumber() {
               : 'Enter your details to get started'}
           </Text>
 
-          {/* ── Name field — signup only ── */}
+          {/* Name field — signup only */}
           {mode === 'signup' && (
             <View style={styles.inputRow}>
               <Text style={styles.inputIcon}>👤</Text>
@@ -129,7 +128,7 @@ export default function OtpNumber() {
             </View>
           )}
 
-          {/* ── Phone field ── */}
+          {/* Phone field */}
           <View style={styles.inputRow}>
             <Text style={styles.prefix}>+91</Text>
             <TextInput
@@ -144,9 +143,7 @@ export default function OtpNumber() {
             />
           </View>
 
-          {!!error && (
-            <Text style={styles.errorText}>{error}</Text>
-          )}
+          {!!error && <Text style={styles.errorText}>{error}</Text>}
 
           <Pressable
             style={[styles.sendBtn, (!isValid || loading) && styles.sendBtnDisabled]}
@@ -160,18 +157,16 @@ export default function OtpNumber() {
 
           <View style={styles.orRow}>
             <View style={styles.orLine} />
-            <Text style={styles.orText}>Or continue with</Text>
+            <Text style={styles.orText}>Or login with</Text>
             <View style={styles.orLine} />
           </View>
 
           <Pressable style={styles.googleBtn}>
-            <View style={styles.googleIconCircle}>
-              <Text style={styles.googleIconText}>G</Text>
-            </View>
+            <AntDesign name="google" size={22} color="#4285F4" />
             <Text style={styles.googleText}>Google</Text>
           </Pressable>
 
-          {/* ── Mode switch link ── */}
+          {/* Mode switch link */}
           <View style={styles.switchRow}>
             <Text style={styles.switchLabel}>
               {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
@@ -193,30 +188,28 @@ export default function OtpNumber() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.primary },
+  container: { flex: 1, backgroundColor: Colors.surface },
   flex: { flex: 1 },
 
   greenTop: {
-    height: 220,
-    backgroundColor: Colors.primary,
+    height: 320,
+    backgroundColor: Colors.primaryDark,
+    borderBottomLeftRadius: 50,
+    borderBottomRightRadius: 50,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  illustrationWrap: { alignItems: 'center' },
-  illustrationEmoji: { fontSize: 80 },
+  illustration: { fontSize: 90 },
 
   bottomCard: {
     flexGrow: 1,
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
     paddingHorizontal: Spacing.xxl,
     paddingTop: Spacing.xl,
     paddingBottom: Spacing.xxxl,
     gap: Spacing.md,
   },
 
-  /* ── Mode toggle ── */
+  /* Mode toggle */
   modeToggle: {
     flexDirection: 'row',
     backgroundColor: Colors.background,
@@ -231,7 +224,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
   },
   modeBtnActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryDark,
     ...Shadow.sm,
   },
   modeBtnText: {
@@ -239,9 +232,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
     color: Colors.textMuted,
   },
-  modeBtnTextActive: {
-    color: Colors.textInverse,
-  },
+  modeBtnTextActive: { color: Colors.textInverse },
 
   heading: {
     fontFamily: FontFamily.bold,
@@ -256,21 +247,18 @@ const styles = StyleSheet.create({
     marginTop: -Spacing.xs,
   },
 
-  /* ── Inputs ── */
+  /* Inputs */
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: Radius.full,
     borderWidth: 1.5,
-    borderColor: Colors.primary,
+    borderColor: Colors.primaryDark,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     backgroundColor: Colors.surface,
   },
-  inputIcon: {
-    fontSize: 16,
-    marginRight: Spacing.sm,
-  },
+  inputIcon: { fontSize: 16, marginRight: Spacing.sm },
   prefix: {
     fontFamily: FontFamily.medium,
     fontSize: FontSize.md,
@@ -289,18 +277,19 @@ const styles = StyleSheet.create({
   errorText: {
     fontFamily: FontFamily.regular,
     fontSize: FontSize.sm,
-    color: '#D32F2F',
+    color: Colors.danger,
     textAlign: 'center',
     marginTop: -Spacing.xs,
   },
 
-  /* ── Send OTP button ── */
+  /* Send OTP button */
   sendBtn: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryDark,
     borderRadius: Radius.full,
     paddingVertical: Spacing.lg,
     alignItems: 'center',
     marginTop: Spacing.xs,
+    ...Shadow.sm,
   },
   sendBtnDisabled: { opacity: 0.5 },
   sendBtnText: {
@@ -309,11 +298,12 @@ const styles = StyleSheet.create({
     color: Colors.textInverse,
   },
 
-  /* ── Divider ── */
+  /* Divider */
   orRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
+    marginVertical: Spacing.xs,
   },
   orLine: { flex: 1, height: 1, backgroundColor: Colors.border },
   orText: {
@@ -322,7 +312,7 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
 
-  /* ── Google button ── */
+  /* Google button */
   googleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -332,22 +322,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     paddingVertical: Spacing.md,
     gap: Spacing.md,
+    backgroundColor: Colors.surface,
     ...Shadow.sm,
-  },
-  googleIconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  googleIconText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.md,
-    color: '#4285F4',
   },
   googleText: {
     fontFamily: FontFamily.medium,
@@ -355,7 +331,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
 
-  /* ── Mode switch link ── */
+  /* Mode switch link */
   switchRow: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -370,14 +346,14 @@ const styles = StyleSheet.create({
   switchLink: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.sm,
-    color: Colors.primary,
+    color: Colors.primaryDark,
   },
 
-  /* ── Skip ── */
+  /* Skip */
   skipWrap: { alignItems: 'center', paddingTop: Spacing.xs },
   skipText: {
     fontFamily: FontFamily.medium,
     fontSize: FontSize.sm,
-    color: Colors.textMuted,
+    color: Colors.primaryDark,
   },
 });

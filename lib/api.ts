@@ -103,3 +103,54 @@ export function imgUrl(image_url: string | null | undefined): string | null {
   if (image_url.startsWith('http')) return image_url;
   return `${BASE_URL}${image_url}`;
 }
+
+/* ── Market types ─────────────────────────────────────────── */
+export interface ApiMarketCategory {
+  id:          number;
+  name:        string;   // 'Rythu Bazar' | 'Local Market'
+  slug:        string;   // 'rythu-bazar' | 'local-market'
+  description: string | null;
+}
+
+export interface ApiMarket {
+  id:             number;
+  category_id:    number;
+  category_name:  string;
+  category_slug:  string;
+  name:           string;
+  area:           string;
+  address:        string | null;
+  lat:            number | null;
+  lng:            number | null;
+  distance_km:    number | null;
+  rating:         number;
+  reviews_count:  number;
+  vendors_count:  number;
+  opens:          string | null;  // '6:00 AM'
+  closes:         string | null;  // '1:00 PM'
+  open_hour:      number | null;
+  close_hour:     number | null;
+  days:           string | null;  // 'Mon–Sat' | 'Daily'
+  holiday:        string | null;  // 'Tuesday' | 'None'
+  day_of_week:    string | null;  // 'Sun' | 'Mon' … for local markets
+  bg_color:       string;
+  facilities:     string[];
+  is_active:      boolean;
+}
+
+export const marketApi = {
+  getCategories: () =>
+    api.get<ApiMarketCategory[]>('/api/markets/categories'),
+
+  getAll: (params?: { type?: string; day?: string; search?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.type)   qs.set('type',   params.type);
+    if (params?.day)    qs.set('day',    params.day);
+    if (params?.search) qs.set('search', params.search);
+    const q = qs.toString();
+    return api.get<ApiMarket[]>(`/api/markets${q ? `?${q}` : ''}`);
+  },
+
+  getById: (id: number | string) =>
+    api.get<ApiMarket>(`/api/markets/${id}`),
+};

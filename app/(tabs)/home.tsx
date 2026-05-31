@@ -12,16 +12,18 @@ import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius, Shadow } from '../../constants/spacing';
 import { useSelector } from 'react-redux';
 import { selectAuth } from '../../store/authSlice';
-import { api, ApiProduct } from '../../lib/api';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { api, ApiProduct, imgUrl } from '../../lib/api';
 
 interface MarketRate { id: string; emoji: string; name: string; te: string; today: number; prev: number; chg: number; unit: string; }
-interface ShopProduct { id: string; name: string; te: string; emoji: string; price: number; orig: number; unit: string; }
+interface ShopProduct { id: string; name: string; te: string; emoji: string; price: number; orig: number; unit: string; image_url: string | null; }
 
 function apiToRate(p: ApiProduct): MarketRate {
   return { id: p.id, emoji: p.emoji || '🥦', name: p.name, te: p.telugu_name || '', today: p.price, prev: p.previous_price, chg: +(p.price - p.previous_price).toFixed(0), unit: p.unit };
 }
 function apiToShop(p: ApiProduct): ShopProduct {
-  return { id: p.id, name: p.name, te: p.telugu_name || '', emoji: p.emoji || '🥦', price: p.price, orig: p.previous_price, unit: p.unit };
+  return { id: p.id, name: p.name, te: p.telugu_name || '', emoji: p.emoji || '🥦', price: Math.round(p.price), orig: Math.round(p.previous_price), unit: p.unit, image_url: imgUrl(p.image_url) };
 }
 import Badge from '../../components/ui/Badge';
 import { useCart } from '../../hooks/useCart';
@@ -171,7 +173,7 @@ export default function HomeScreen() {
       <StatusBar style="light" />
 
       {/* Green Header */}
-      <View style={styles.header}>
+      <LinearGradient colors={['#1B5E35', '#4CAF6F']} start={{ x: 0, y: 0 }} end={{ x: 0.4, y: 1 }} style={styles.header}>
         <View style={styles.headerRow1}>
           <Pressable
             style={styles.locationCol}
@@ -218,7 +220,7 @@ export default function HomeScreen() {
             </Pressable>
           )}
         </View>
-      </View>
+      </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         <View style={{ height: Spacing.xl }} />
@@ -290,21 +292,21 @@ export default function HomeScreen() {
           numColumns={2}
           scrollEnabled={false}
           keyExtractor={i => i.id}
-          columnWrapperStyle={{ gap: Spacing.md, paddingHorizontal: Spacing.lg }}
+          columnWrapperStyle={{ gap: Spacing.sm, paddingHorizontal: Spacing.md }}
           contentContainerStyle={{ gap: Spacing.md }}
           renderItem={({ item }) => (
             <Pressable style={prodCard.card} onPress={() => router.push({ pathname: '/shop-details', params: { id: item.id } } as any)}>
-              <View style={prodCard.photoArea}>
-                <Text style={prodCard.emoji}>{item.emoji}</Text>
-              </View>
+              {item.image_url
+                ? <Image source={{ uri: item.image_url }} style={prodCard.photo} contentFit="cover" />
+                : <View style={prodCard.photoArea}><Text style={prodCard.emoji}>{item.emoji}</Text></View>
+              }
               <View style={prodCard.info}>
-                <Text style={prodCard.name}>{item.name}</Text>
-                <Text style={prodCard.te}>{item.te}</Text>
+                <Text style={prodCard.name} numberOfLines={1}>{item.name}</Text>
                 <Text style={prodCard.unit}>{item.unit}</Text>
                 <View style={prodCard.footer}>
                   <View style={prodCard.priceRow}>
                     <Text style={prodCard.price}>₹{item.price}</Text>
-                    <Text style={prodCard.orig}>₹{item.orig}</Text>
+                    {item.orig > item.price && <Text style={prodCard.orig}>₹{item.orig}</Text>}
                   </View>
                   <Pressable
                     style={prodCard.addBtn}
@@ -408,18 +410,18 @@ const favStyles = StyleSheet.create({
 });
 
 const prodCard = StyleSheet.create({
-  card: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm },
-  photoArea: { height: 130, backgroundColor: '#F5F5F0', alignItems: 'center', justifyContent: 'center' },
-  emoji: { fontSize: 62 },
-  info: { padding: Spacing.md },
-  name: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary, marginBottom: 2 },
-  te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: 2 },
-  unit: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.sm },
-  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  card: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.md },
+  photo: { width: '100%', height: 155 },
+  photoArea: { height: 155, backgroundColor: '#F5F5F0', alignItems: 'center', justifyContent: 'center' },
+  emoji: { fontSize: 56 },
+  info: { padding: 10, gap: Spacing.xs },
+  name: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary },
+  unit: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted },
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.sm },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
-  price: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary },
+  price: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
   orig: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, textDecorationLine: 'line-through' },
-  addBtn: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  addBtn: { width: 72, height: 36, backgroundColor: Colors.primaryDark, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center' },
   addText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textInverse },
 });
 

@@ -35,8 +35,8 @@ const styles = StyleSheet.create({
     marginRight: Spacing.sm,
   },
   active: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryDark,
+    borderColor: Colors.primaryDark,
   },
   label: {
     fontFamily: FontFamily.medium,

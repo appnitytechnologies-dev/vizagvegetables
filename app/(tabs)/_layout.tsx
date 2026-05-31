@@ -1,4 +1,4 @@
-import { Tabs, usePathname, useRouter } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +7,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Shadow, Spacing } from '../../constants/spacing';
-import CartFAB from '../../components/CartFAB';
 import { useCart } from '../../hooks/useCart';
 import { AppDispatch } from '../../store';
 import { selectIsGuest, setPendingAction } from '../../store/authSlice';
@@ -72,8 +71,6 @@ function TabBar({ state, navigation }: any) {
 }
 
 export default function TabsLayout() {
-  const pathname = usePathname();
-
   return (
     <View style={{ flex: 1 }}>
       <Tabs tabBar={props => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
@@ -83,7 +80,6 @@ export default function TabsLayout() {
         <Tabs.Screen name="shop" />
         <Tabs.Screen name="profile" />
       </Tabs>
-      {!pathname.endsWith('/shop') && <CartFAB />}
     </View>
   );
 }
