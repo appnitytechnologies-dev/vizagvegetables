@@ -12,7 +12,7 @@ import { Spacing, Radius, Shadow } from '../constants/spacing';
 import { api, ApiProduct, imgUrl } from '../lib/api';
 import { useCart } from '../hooks/useCart';
 import { useAuthGuard } from '../hooks/useAuthGuard';
-import CartFAB from '../components/CartFAB';
+import FloatingCart from '../components/ui/FloatingCart';
 
 const QTY_OPTIONS = [1, 2, 5, 10];
 
@@ -49,9 +49,9 @@ export default function ShopDetails() {
     if (!product) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     guard(
-      { type: 'ADD_TO_CART', payload: { id: product.id, name: product.name, te: product.telugu_name || '', emoji: product.emoji || '🥦', price: product.price, unit: product.unit, quantity: selectedQty }, returnTo: '/shop-details' },
+      { type: 'ADD_TO_CART', payload: { id: product.id, name: product.name, te: product.telugu_name || '', emoji: product.emoji || '🥦', image_url: photo, price: product.price, unit: product.unit, quantity: selectedQty }, returnTo: '/shop-details' },
       () => {
-        addItem({ id: product.id, name: product.name, te: product.telugu_name || '', emoji: product.emoji || '🥦', price: product.price, unit: product.unit, quantity: selectedQty });
+        addItem({ id: product.id, name: product.name, te: product.telugu_name || '', emoji: product.emoji || '🥦', image_url: photo, price: product.price, unit: product.unit, quantity: selectedQty });
         setAdded(true);
         setTimeout(() => setAdded(false), 1800);
       }
@@ -175,7 +175,7 @@ export default function ShopDetails() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      <CartFAB />
+      <FloatingCart />
 
       {/* ── Sticky bottom bar ── */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom || Spacing.lg }]}>
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   heroScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.08)' },
   iconBtn: { position: 'absolute', width: 40, height: 40, borderRadius: Radius.md, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', ...Shadow.sm },
   discountBadge: { position: 'absolute', bottom: 56, right: Spacing.lg, backgroundColor: Colors.danger, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
-  discountText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.textInverse },
+  discountText: { fontFamily: FontFamily.numBold, fontSize: FontSize.xs, color: Colors.textInverse },
   dotsRow: { position: 'absolute', bottom: Spacing.lg, alignSelf: 'center', flexDirection: 'row', gap: 6 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.45)' },
   dotActive: { backgroundColor: Colors.surface },
@@ -237,15 +237,15 @@ const styles = StyleSheet.create({
   productName: { fontFamily: FontFamily.bold, fontSize: FontSize.xxxl, color: Colors.textPrimary, letterSpacing: -0.5 },
   productTe: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, marginTop: 2 },
   productUnit: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, marginTop: 4 },
-  price: { fontFamily: FontFamily.bold, fontSize: FontSize.xxxl, color: Colors.textPrimary, letterSpacing: -0.5 },
-  origPrice: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, textDecorationLine: 'line-through', textAlign: 'right' },
+  price: { fontFamily: FontFamily.numBold, fontSize: FontSize.xxxl, color: Colors.textPrimary, letterSpacing: -0.5 },
+  origPrice: { fontFamily: FontFamily.num, fontSize: FontSize.sm, color: Colors.textMuted, textDecorationLine: 'line-through', textAlign: 'right' },
 
   /* Quantity */
   sectionLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.md, color: Colors.textMuted, marginBottom: Spacing.md },
   weightRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.xl, flexWrap: 'wrap' },
   weightChip: { borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm },
   weightChipActive: { borderColor: Colors.primaryDark },
-  weightText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
+  weightText: { fontFamily: FontFamily.numMed, fontSize: FontSize.sm, color: Colors.textSecondary },
   weightTextActive: { color: Colors.primaryDark },
 
   divider: { height: 1, backgroundColor: Colors.border, marginBottom: Spacing.lg },
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   stepBtn: { width: 40, height: 40, borderRadius: Radius.md, borderWidth: 1.5, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
   stepIcon: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
   stepQtyBox: { width: 44, height: 40, borderRadius: Radius.md, backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  stepQty: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.primaryDark },
+  stepQty: { fontFamily: FontFamily.numBold, fontSize: FontSize.lg, color: Colors.primaryDark },
   addToCartBtn: { flex: 1, backgroundColor: Colors.primaryDark, borderRadius: Radius.full, paddingVertical: Spacing.lg, alignItems: 'center', ...Shadow.sm },
   addToCartBtnAdded: { backgroundColor: Colors.success },
   addToCartText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.md, color: Colors.textInverse },

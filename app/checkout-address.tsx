@@ -40,15 +40,18 @@ const EMPTY: NewAddrForm = {
 type Errors = Partial<Record<keyof NewAddrForm, string>>;
 
 function NewAddressForm({
-  form, setForm, errors,
+  form, setForm, errors, setErrors,
 }: {
   form: NewAddrForm;
   setForm: React.Dispatch<React.SetStateAction<NewAddrForm>>;
   errors: Errors;
+  setErrors: React.Dispatch<React.SetStateAction<Errors>>;
 }) {
   const [showStatePicker, setShowStatePicker] = useState(false);
-  const set = (key: keyof NewAddrForm, val: any) =>
+  const set = (key: keyof NewAddrForm, val: any) => {
     setForm(f => ({ ...f, [key]: val }));
+    if (errors[key]) setErrors(e => { const n = { ...e }; delete n[key]; return n; });
+  };
 
   return (
     <View style={{ gap: Spacing.md }}>
@@ -157,7 +160,8 @@ function NewAddressForm({
 
 /* ─── Main screen ────────────────────────────────────── */
 export default function CheckoutAddress() {
-  const { count, total } = useCart();
+  const { items, total } = useCart();
+  const count = items.length;
   const [addresses,    setAddresses]    = useState<UserAddress[]>([]);
   const [loadingAddrs, setLoadingAddrs] = useState(true);
   const [selectedId,   setSelectedId]  = useState<string | null>(null);
@@ -323,6 +327,7 @@ export default function CheckoutAddress() {
                     form={newForm}
                     setForm={setNewForm}
                     errors={formErrors}
+                    setErrors={setFormErrors}
                   />
                 </View>
               )}

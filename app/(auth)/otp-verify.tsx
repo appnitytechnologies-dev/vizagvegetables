@@ -18,17 +18,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDispatch, useSelector } from 'react-redux';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
-import { Spacing, Radius, Shadow } from '../../constants/spacing';
+import { Spacing, Radius } from '../../constants/spacing';
 import { AppDispatch } from '../../store';
 import { loginSuccess, clearPendingAction, selectPendingAction } from '../../store/authSlice';
-import { addToCart, CartItem } from '../../store/cartSlice';
+import { addToCart, clearCart, CartItem } from '../../store/cartSlice';
 import { toggleFavourite, setFavourites } from '../../store/favouritesSlice';
 import { api, setToken } from '../../lib/api';
+import { AntDesign } from '@expo/vector-icons';
 
 const OTP_LENGTH = 6;
 
 export default function OtpVerify() {
-  const { phone, name: paramName, mode } = useLocalSearchParams<{ phone: string; name?: string; mode?: string }>();
+  const { phone } = useLocalSearchParams<{ phone: string }>();
   const [otp, setOtp]       = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [timer, setTimer]   = useState(30);
   const [loading, setLoading] = useState(false);
@@ -37,7 +38,6 @@ export default function OtpVerify() {
   const dispatch       = useDispatch<AppDispatch>();
   const pendingAction  = useSelector(selectPendingAction);
 
-  /* one shared value per digit */
   const s0 = useSharedValue(1); const s1 = useSharedValue(1);
   const s2 = useSharedValue(1); const s3 = useSharedValue(1);
   const s4 = useSharedValue(1); const s5 = useSharedValue(1);
@@ -97,7 +97,7 @@ export default function OtpVerify() {
         token: string;
         user: { id: string; phone: string; name?: string };
         isNewUser: boolean;
-      }>('/api/auth/verify-otp', { phone, otp: otp.join(''), name: paramName || undefined, mode: mode || 'signup' });
+      }>('/api/auth/verify-otp', { phone, otp: otp.join('') });
 
       /* persist token */
       await setToken(res.token);
@@ -112,13 +112,18 @@ export default function OtpVerify() {
         name:  displayName,
       }));
 
-      /* load favourites from server so they reflect what the user saved on web/other devices */
+      /* load favourites + cart from server so they reflect what the user saved on web/other devices */
       try {
         const favIds = await api.get<string[]>('/api/favorites');
         dispatch(setFavourites(favIds));
-      } catch {
-        // non-fatal — favourites start empty if network fails
-      }
+      } catch {}
+      try {
+        const cartItems = await api.get<CartItem[]>('/api/cart');
+        if (cartItems.length > 0) {
+          dispatch(clearCart());
+          cartItems.forEach(item => dispatch(addToCart(item)));
+        }
+      } catch {}
 
       /* replay any action the user tried before logging in */
       if (pendingAction) {
@@ -155,68 +160,74 @@ export default function OtpVerify() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
-      <Pressable onPress={() => router.back()} style={styles.backBtn}>
-        <Text style={styles.backArrow}>←</Text>
+      <Pressable
+        onPress={() => {
+          if (router.canGoBack()) router.back();
+          else router.replace('/(auth)/otp-number');
+        }}
+        style={styles.backBtn}
+        hitSlop={12}
+      >
+        <AntDesign name="arrow-left" size={20} color={Colors.textPrimary} />
       </Pressable>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.content}
+        style={styles.kav}
       >
-        <Text style={styles.heading}>Verify Code</Text>
-        <Text style={styles.sub}>
-          Please enter the 6-digit code we sent to {maskedPhone}
-        </Text>
+        <View style={styles.topSection}>
+          <Text style={styles.heading}>Verify Code</Text>
+          <Text style={styles.sub}>
+            Please enter the code we just sent to {maskedPhone}
+          </Text>
 
-        {/* Dev hint */}
-        <View style={styles.devHint}>
-          <Text style={styles.devHintText}>🔧 Testing — check API console for the OTP</Text>
-        </View>
-
-        {!!error && (
-          <Text style={styles.errorText}>{error}</Text>
-        )}
-
-        <View style={styles.otpRow}>
-          {otp.map((digit, idx) => (
-            <Animated.View
-              key={idx}
-              style={[styles.otpBox, digit ? styles.otpBoxFilled : null, animStyles[idx]]}
-            >
-              <TextInput
-                ref={r => { inputs.current[idx] = r; }}
-                style={styles.otpInput}
-                keyboardType="number-pad"
-                maxLength={1}
-                value={digit}
-                onChangeText={t => handleChange(t, idx)}
-                onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, idx)}
-                caretHidden
-              />
-            </Animated.View>
-          ))}
-        </View>
-
-        <View style={styles.resendRow}>
-          <Text style={styles.resendLabel}>Didn't receive OTP?</Text>
-          {timer > 0 ? (
-            <Text style={styles.resendTimer}>Resend in {timer}s</Text>
-          ) : (
-            <Pressable onPress={handleResend}>
-              <Text style={styles.resendLink}>Resend Code</Text>
-            </Pressable>
+          {!!error && (
+            <Text style={styles.errorText}>{error}</Text>
           )}
+
+          <View style={styles.otpRow}>
+            {otp.map((digit, idx) => (
+              <Animated.View
+                key={idx}
+                style={[styles.otpBox, digit ? styles.otpBoxFilled : null, animStyles[idx]]}
+              >
+                <TextInput
+                  ref={r => { inputs.current[idx] = r; }}
+                  style={styles.otpInput}
+                  keyboardType="number-pad"
+                  maxLength={1}
+                  value={digit}
+                  onChangeText={t => handleChange(t, idx)}
+                  onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, idx)}
+                  caretHidden
+                />
+              </Animated.View>
+            ))}
+          </View>
+
+          <View style={styles.resendRow}>
+            <Text style={styles.resendLabel}>Didn't receive OTP</Text>
+            {timer > 0 ? (
+              <Text style={styles.resendTimer}>Resend in {timer}s</Text>
+            ) : (
+              <Pressable onPress={handleResend}>
+                <Text style={styles.resendLink}>Resend Code</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
 
-        <Pressable
-          style={[styles.verifyBtn, (!isComplete || loading) && styles.verifyBtnDisabled]}
-          onPress={handleVerify}
-        >
-          {loading
-            ? <ActivityIndicator color={Colors.textInverse} size="small" />
-            : <Text style={styles.verifyBtnText}>Verify &amp; Continue</Text>
-          }
-        </Pressable>
+        <View style={styles.bottomBar}>
+          <Pressable
+            style={[styles.verifyBtn, (!isComplete || loading) && styles.verifyBtnDisabled]}
+            onPress={handleVerify}
+          >
+            {loading
+              ? <ActivityIndicator color={Colors.textInverse} size="small" />
+              : <Text style={styles.verifyBtnText}>Verify & Continue</Text>
+            }
+          </Pressable>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -225,29 +236,35 @@ export default function OtpVerify() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.surface },
   backBtn: {
-    marginLeft: Spacing.lg,
-    marginTop: Spacing.sm,
-    width: 44,
-    height: 44,
+    marginLeft: Spacing.xl,
+    marginTop: Spacing.xl,
+    width: 46,
+    height: 46,
     borderRadius: Radius.full,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
-    ...Shadow.sm,
   },
-  backArrow: { fontSize: 18, color: Colors.textPrimary },
-  content: {
+  kav: {
     flex: 1,
     paddingHorizontal: Spacing.xxl,
-    paddingTop: Spacing.xxxl,
+  },
+  topSection: {
+    flex: 1,
+    paddingTop: Spacing.xxl,
+  },
+  bottomBar: {
+    paddingBottom: Spacing.xl,
   },
   heading: {
     fontFamily: FontFamily.bold,
-    fontSize: FontSize.xxxl,
+    fontSize: 28,
     color: Colors.textPrimary,
     letterSpacing: -0.3,
     textAlign: 'center',
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   sub: {
     fontFamily: FontFamily.regular,
@@ -255,22 +272,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: Spacing.md,
-  },
-  devHint: {
-    backgroundColor: '#FFF8E1',
-    borderWidth: 1,
-    borderColor: '#FFE082',
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
-    alignItems: 'center',
-  },
-  devHintText: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.xs,
-    color: '#F57F17',
+    marginBottom: 40,
   },
   errorText: {
     fontFamily: FontFamily.regular,
@@ -281,15 +283,16 @@ const styles = StyleSheet.create({
   },
   otpRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    marginVertical: Spacing.lg,
+    justifyContent: 'space-between',
+    marginBottom: 40,
   },
   otpBox: {
-    width: 50,
-    height: 58,
-    borderRadius: Radius.md,
+    width: 46,
+    height: 52,
+    borderRadius: 12,
     backgroundColor: Colors.primaryLight,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -309,7 +312,7 @@ const styles = StyleSheet.create({
   resendRow: {
     alignItems: 'center',
     gap: Spacing.xs,
-    marginBottom: Spacing.xl,
+    marginBottom: 32,
   },
   resendLabel: {
     fontFamily: FontFamily.regular,
@@ -324,13 +327,13 @@ const styles = StyleSheet.create({
   resendLink: {
     fontFamily: FontFamily.semiBold,
     fontSize: FontSize.sm,
-    color: Colors.warning,
+    color: '#FF7043',
     textDecorationLine: 'underline',
   },
   verifyBtn: {
-    backgroundColor: Colors.primary,
+    backgroundColor: '#4CAF50',
     borderRadius: Radius.full,
-    paddingVertical: Spacing.lg,
+    paddingVertical: 18,
     alignItems: 'center',
     marginBottom: Spacing.lg,
   },

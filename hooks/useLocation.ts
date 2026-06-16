@@ -52,12 +52,12 @@ export const useLocation = (): LocationState => {
         const result = await Location.requestForegroundPermissionsAsync();
         status = result.status;
       } catch {
-        if (!cancelled) { setLocationText(''); setLoading(false); }
+        if (!cancelled) { setLocationText('Visakhapatnam'); setLoading(false); }
         return;
       }
 
       if (status !== 'granted') {
-        if (!cancelled) { setLocationText(''); setLoading(false); }
+        if (!cancelled) { setLocationText('Visakhapatnam'); setLoading(false); }
         return;
       }
 
@@ -70,10 +70,10 @@ export const useLocation = (): LocationState => {
           longitude: pos.coords.longitude,
         });
         if (!cancelled) {
-          setLocationText(results.length > 0 ? formatAddress(results[0]) : '');
+          setLocationText(results.length > 0 ? formatAddress(results[0]) : 'Visakhapatnam');
         }
       } catch {
-        if (!cancelled) setLocationText('');
+        if (!cancelled) setLocationText('Visakhapatnam');
       } finally {
         if (!cancelled) setLoading(false);
       }

@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Pressable,
   Dimensions,
-  Image,
   FlatList,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -14,52 +13,105 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
+import Animated, {
+  FadeInDown,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from 'react-native-reanimated';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius, Shadow } from '../../constants/spacing';
+import PricesIllustration from '../../components/illustrations/PricesIllustration';
+import MarketIllustration from '../../components/illustrations/MarketIllustration';
+import DeliveryIllustration from '../../components/illustrations/DeliveryIllustration';
 
-const { width } = Dimensions.get('window');
+const { width, height: SCREEN_H } = Dimensions.get('window');
+const AMBER = '#F59E0B';
 
-const SLIDES = [
+interface Slide {
+  id: string;
+  eyebrow: string;
+  titleBefore: string;
+  titleHighlight: string;
+  titleAfter: string;
+  subtitle: string;
+}
+
+const SLIDES: Slide[] = [
   {
     id: '1',
-    image: require('../../assets/images/grocery-illustration.png'),
-    prefix: 'Vizag Vegetables is a solution for ',
-    bold: 'Grocery Shopping',
-    suffix: ' every you need',
+    eyebrow: 'EVERY MORNING, FRESH',
+    titleBefore: 'Check ',
+    titleHighlight: "today's Rythu Bazar",
+    titleAfter: ' prices before you leave home',
+    subtitle: 'ప్రతిరోజూ తాజా మార్కెట్ ధరలు',
   },
   {
     id: '2',
-    image: require('../../assets/images/onboard-1.png'),
-    prefix: 'Get your fresh groceries delivered ',
-    bold: 'In No Time',
-    suffix: ' right to your doorstep',
+    eyebrow: 'ALWAYS CLOSE BY',
+    titleBefore: 'Find the ',
+    titleHighlight: 'nearest open market',
+    titleAfter: ' around you in seconds',
+    subtitle: 'మీ దగ్గర్లోని రైతు బజార్లు',
   },
   {
     id: '3',
-    image: require('../../assets/images/onboard-2.png'),
-    prefix: 'Shop for fresh vegetables ',
-    bold: 'Online',
-    suffix: " from Vizag's best local markets",
+    eyebrow: 'FARM TO YOUR DOOR',
+    titleBefore: 'Order ',
+    titleHighlight: 'fresh vegetables',
+    titleAfter: ' and get them delivered fast',
+    subtitle: 'ఇంటికే తాజా కూరగాయలు',
   },
 ];
 
+function SlideIllustration({ id, size }: { id: string; size: number }) {
+  if (id === '1') return <PricesIllustration size={size} />;
+  if (id === '2') return <MarketIllustration size={size} />;
+  return <DeliveryIllustration size={size} />;
+}
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export default function GetStarted() {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [slideAreaHeight, setSlideAreaHeight] = useState(0);
+  const [listHeight, setListHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  const btnScale = useSharedValue(1);
+
+  const btnStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: btnScale.value }],
+  }));
+
+  const isLast = activeIndex === SLIDES.length - 1;
+
+  // Illustration area = 56% of slide height; illustration SVG fills 90% of that
+  const slideHeight = listHeight > 0 ? listHeight : SCREEN_H * 0.72;
+  const illusAreaH  = slideHeight * 0.56;
+  const illusSize   = Math.min(illusAreaH * 0.90, width * 0.84, 300);
 
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / width);
     setActiveIndex(index);
   };
 
-  const handleListLayout = (e: { nativeEvent: { layout: { height: number } } }) => {
-    setSlideAreaHeight(e.nativeEvent.layout.height);
+  const handleNext = () => {
+    btnScale.value = withSpring(0.95, { damping: 10 }, () => {
+      btnScale.value = withSpring(1, { damping: 12 });
+    });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (!isLast) {
+      flatListRef.current?.scrollToOffset({
+        offset: (activeIndex + 1) * width,
+        animated: true,
+      });
+    } else {
+      router.push('/(auth)/otp-number');
+    }
   };
 
-  const handleGetStarted = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const handleSkip = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push('/(auth)/otp-number');
   };
 
@@ -67,11 +119,20 @@ export default function GetStarted() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
 
-      <View style={styles.header}>
-        <Text style={styles.brandTitle}>Vizag Vegetables</Text>
-        <Text style={styles.brandIcon}>🥕</Text>
-      </View>
+      {/* ── Header ── */}
+      <Animated.View entering={FadeInDown.delay(80).duration(420)} style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerEmoji}>🔥</Text>
+          <Text style={styles.headerTitle}>Vizag Vegetables</Text>
+        </View>
+        {!isLast && (
+          <Pressable onPress={handleSkip} hitSlop={14}>
+            <Text style={styles.skipText}>Skip</Text>
+          </Pressable>
+        )}
+      </Animated.View>
 
+      {/* ── Slides ── */}
       <FlatList
         ref={flatListRef}
         data={SLIDES}
@@ -80,40 +141,46 @@ export default function GetStarted() {
         showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={handleScroll}
-        onLayout={handleListLayout}
-        style={styles.list}
+        onLayout={e => setListHeight(e.nativeEvent.layout.height)}
         keyExtractor={item => item.id}
+        style={styles.list}
         renderItem={({ item }) => (
-          <View style={[styles.slide, { height: slideAreaHeight }]}>
-            <View style={styles.illustrationArea}>
-              <View style={styles.blob} />
-              <Image
-                source={item.image}
-                style={styles.illustrationImage}
-                resizeMode="contain"
-              />
+          <View style={[styles.slide, { width, height: slideHeight }]}>
+
+            {/* Illustration — fixed proportional height */}
+            <View style={[styles.illustrationArea, { height: illusAreaH }]}>
+              <SlideIllustration id={item.id} size={illusSize} />
             </View>
 
-            <View style={styles.bottom}>
-              <Text style={styles.tagline}>
-                {item.prefix}
-                <Text style={styles.taglineBold}>{item.bold}</Text>
-                {item.suffix}
+            {/* Text block */}
+            <View style={styles.textBlock}>
+              <Text style={styles.eyebrow}>{item.eyebrow}</Text>
+              <Text style={styles.title}>
+                {item.titleBefore}
+                <Text style={styles.titleHighlight}>{item.titleHighlight}</Text>
+                {item.titleAfter}
               </Text>
-
-              <Pressable style={styles.button} onPress={handleGetStarted}>
-                <Text style={styles.buttonText}>Get Started</Text>
-              </Pressable>
-
-              <View style={styles.dotsRow}>
-                {SLIDES.map((_, i) => (
-                  <View key={i} style={[styles.dot, activeIndex === i && styles.dotActive]} />
-                ))}
-              </View>
+              <Text style={styles.teluguSubtitle}>{item.subtitle}</Text>
             </View>
+
           </View>
         )}
       />
+
+      {/* ── Bottom: button + dots ── */}
+      <Animated.View entering={FadeInDown.delay(220).duration(420)} style={styles.bottom}>
+        <AnimatedPressable style={[styles.button, btnStyle]} onPress={handleNext}>
+          <Text style={styles.buttonText}>
+            {isLast ? 'Get Started' : 'Next  →'}
+          </Text>
+        </AnimatedPressable>
+
+        <View style={styles.dotsRow}>
+          {SLIDES.map((_, i) => (
+            <View key={i} style={[styles.dot, activeIndex === i && styles.dotActive]} />
+          ))}
+        </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -121,71 +188,84 @@ export default function GetStarted() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: Colors.primary,
   },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.xxl,
-    paddingTop: Spacing.lg,
+    paddingTop: Spacing.sm,
     paddingBottom: Spacing.sm,
   },
-  brandTitle: {
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  headerEmoji: { fontSize: 20 },
+  headerTitle: {
     fontFamily: FontFamily.bold,
-    fontSize: FontSize.xl,
+    fontSize: FontSize.lg,
     color: Colors.textInverse,
   },
-  brandIcon: {
-    fontSize: 28,
+  skipText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.md,
+    color: Colors.textInverse,
+    opacity: 0.82,
   },
 
-  list: {
-    flex: 1,
-  },
-  slide: {
-    width,
-    flexDirection: 'column',
-  },
+  list: { flex: 1 },
+  slide: { flexDirection: 'column' },
 
   illustrationArea: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  blob: {
-    position: 'absolute',
-    width: width * 1.05,
-    height: width * 1.05,
-    borderRadius: (width * 1.05) / 2,
-    backgroundColor: 'rgba(255,255,255,0.09)',
+
+  textBlock: {
+    flex: 1,
+    paddingHorizontal: Spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: Spacing.sm,
   },
-  illustrationImage: {
-    width: width * 0.85,
-    height: width * 0.85,
+  eyebrow: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.65)',
+    letterSpacing: 2.5,
+    textTransform: 'uppercase',
+    marginBottom: Spacing.sm,
+  },
+  title: {
+    fontFamily: FontFamily.bold,
+    fontSize: 27,
+    color: Colors.textInverse,
+    textAlign: 'center',
+    lineHeight: 38,
+    letterSpacing: -0.3,
+    marginBottom: Spacing.sm,
+  },
+  titleHighlight: { color: AMBER },
+  teluguSubtitle: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: 'rgba(255,255,255,0.60)',
+    textAlign: 'center',
   },
 
   bottom: {
     paddingHorizontal: Spacing.xxl,
-    paddingBottom: 40,
+    paddingBottom: Spacing.xxxl,
     alignItems: 'center',
-    gap: Spacing.xl,
+    gap: Spacing.lg,
   },
-  tagline: {
-    fontFamily: FontFamily.regular,
-    fontSize: FontSize.md,
-    color: Colors.textInverse,
-    textAlign: 'center',
-    lineHeight: FontSize.md * 1.65,
-  },
-  taglineBold: {
-    fontFamily: FontFamily.bold,
-    color: Colors.textInverse,
-  },
-
   button: {
     backgroundColor: Colors.surface,
-    borderRadius: Radius.xxl,
+    borderRadius: Radius.full,
     paddingVertical: Spacing.lg,
     width: '100%',
     alignItems: 'center',
@@ -195,22 +275,23 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.semiBold,
     fontSize: FontSize.md,
     color: Colors.primaryDark,
+    letterSpacing: 0.2,
   },
-
   dotsRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     alignItems: 'center',
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: Radius.full,
-    backgroundColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: 'rgba(255,255,255,0.32)',
   },
   dotActive: {
-    width: 10,
-    height: 10,
-    backgroundColor: 'rgba(255,255,255,0.85)',
+    width: 26,
+    height: 8,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.textInverse,
   },
 });

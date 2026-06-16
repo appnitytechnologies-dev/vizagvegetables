@@ -14,6 +14,7 @@ interface AuthState {
   phone:         string;
   name:          string;
   token:         string;
+  avatarUrl:     string | null;
   pendingAction: PendingAction;
 }
 
@@ -24,6 +25,7 @@ const initialState: AuthState = {
   phone:         '',
   name:          '',
   token:         '',
+  avatarUrl:     null,
   pendingAction: null,
 };
 
@@ -46,9 +48,18 @@ const authSlice = createSlice({
       state.id         = '';
       state.phone      = '';
       state.name       = '';
+      state.avatarUrl  = null;
     },
     /* legacy — keep for guest browsing */
-    setGuest(state)    { state.isGuest = true; state.isLoggedIn = false; },
+    setGuest(state) {
+      state.isGuest    = true;
+      state.isLoggedIn = false;
+      state.token      = '';
+      state.id         = '';
+      state.phone      = '';
+      state.name       = '';
+      state.avatarUrl  = null;
+    },
     setLoggedIn(state) { state.isLoggedIn = true; state.isGuest = false; },
     setPendingAction(state, action: PayloadAction<PendingAction>) {
       state.pendingAction = action.payload;
@@ -57,6 +68,9 @@ const authSlice = createSlice({
     updateUserName(state, action: PayloadAction<string>) {
       state.name = action.payload;
     },
+    setAvatarUrl(state, action: PayloadAction<string | null>) {
+      state.avatarUrl = action.payload;
+    },
   },
 });
 
@@ -64,7 +78,7 @@ export const {
   loginSuccess, logout,
   setGuest, setLoggedIn,
   setPendingAction, clearPendingAction,
-  updateUserName,
+  updateUserName, setAvatarUrl,
 } = authSlice.actions;
 
 export const selectAuth          = (s: { auth: AuthState }) => s.auth;

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator, Share } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,14 +9,12 @@ import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
-import { api, ApiProduct } from '../lib/api';
+import { api, ApiProduct, imgUrl } from '../lib/api';
 import { useFavourites } from '../hooks/useFavourites';
-import { useCart } from '../hooks/useCart';
-import Divider from '../components/ui/Divider';
+import PageHeader from '../components/ui/PageHeader';
 
 export default function SavedFavourites() {
-  const { ids, toggle }   = useFavourites();
-  const { addItem }       = useCart();
+  const { ids, toggle } = useFavourites();
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading,  setLoading]  = useState(true);
 
@@ -30,17 +29,9 @@ export default function SavedFavourites() {
   const isEmpty     = favProducts.length === 0;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="dark" />
-
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={22} color={Colors.textPrimary} />
-        </Pressable>
-        <Text style={styles.title}>Saved Favourites</Text>
-        <View style={{ width: 36 }} />
-      </View>
-      <Divider />
+      <PageHeader title="Saved Favourites" fallback="/(tabs)/profile" />
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -48,7 +39,9 @@ export default function SavedFavourites() {
         </View>
       ) : isEmpty ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyEmoji}>❤️</Text>
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name="heart-outline" size={40} color={Colors.danger} />
+          </View>
           <Text style={styles.emptyTitle}>No favourites yet</Text>
           <Text style={styles.emptyBody}>Tap ♡ on products to save them here.</Text>
           <Pressable style={styles.browseBtn} onPress={() => router.push('/(tabs)/shop' as any)}>
@@ -60,57 +53,65 @@ export default function SavedFavourites() {
           data={favProducts}
           keyExtractor={p => p.id}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 40 }}
-          ItemSeparatorComponent={() => <Divider />}
+          contentContainerStyle={styles.list}
           ListHeaderComponent={
-            <Text style={styles.sectionLabel}>Products ({favProducts.length})</Text>
+            <View style={styles.listHeader}>
+              <Text style={styles.countText}>{favProducts.length} saved product{favProducts.length !== 1 ? 's' : ''}</Text>
+            </View>
           }
-          renderItem={({ item }) => (
-            <Pressable
-              style={styles.productRow}
-              onPress={() => router.push({ pathname: '/shop-details', params: { id: item.id } } as any)}
-            >
-              <Text style={styles.rowEmoji}>{item.emoji ?? '🥦'}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowName}>{item.name}</Text>
-                <Text style={styles.rowSub}>
-                  {item.telugu_name ? `${item.telugu_name} · ` : ''}per {item.unit}
-                </Text>
-              </View>
-              <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                <Text style={styles.productPrice}>₹{item.price}</Text>
-                {item.previous_price > item.price && (
-                  <Text style={styles.origPrice}>₹{item.previous_price}</Text>
-                )}
-              </View>
+          renderItem={({ item }) => {
+            const imageUri = imgUrl(item.image_url);
+            return (
               <Pressable
-                style={styles.addBtn}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  addItem({
-                    id:       item.id,
-                    name:     item.name,
-                    te:       item.telugu_name ?? '',
-                    emoji:    item.emoji ?? '🥦',
-                    price:    item.price,
-                    unit:     item.unit,
-                    quantity: 1,
-                  });
-                }}
+                style={({ pressed }) => [styles.card, pressed && { opacity: 0.93 }]}
+                onPress={() => router.push({ pathname: '/shop-details', params: { id: item.id } } as any)}
               >
-                <Text style={styles.addBtnText}>Add</Text>
+                {/* Image */}
+                <View style={styles.imgBox}>
+                  {imageUri
+                    ? <Image source={{ uri: imageUri }} style={styles.img} contentFit="contain" />
+                    : <Text style={styles.emoji}>{item.emoji ?? '🥦'}</Text>
+                  }
+                </View>
+
+                {/* Info */}
+                <View style={styles.info}>
+                  <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+                  {item.telugu_name ? (
+                    <Text style={styles.te} numberOfLines={1}>{item.telugu_name}</Text>
+                  ) : null}
+                  <Text style={styles.unit}>per {item.unit}</Text>
+                  <View style={styles.priceRow}>
+                    <Text style={styles.price}>₹{Math.round(item.price)}</Text>
+                    {item.previous_price > item.price && (
+                      <Text style={styles.orig}>₹{Math.round(item.previous_price)}</Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* Actions */}
+                <View style={styles.actions}>
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); toggle(item.id); }}
+                  >
+                    <Ionicons name="heart" size={20} color={Colors.danger} />
+                  </Pressable>
+                  <Pressable
+                    style={styles.shareBtn}
+                    hitSlop={8}
+                    onPress={() => {
+                      Share.share({
+                        message: `🛒 ${item.name}\n💰 ₹${Math.round(item.price)}/${item.unit}\n\n🌿 Order fresh vegetables: https://vizagvegetables.app`,
+                      });
+                    }}
+                  >
+                    <Ionicons name="share-social-outline" size={18} color={Colors.primary} />
+                  </Pressable>
+                </View>
               </Pressable>
-              <Pressable
-                style={styles.heartBtn}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  toggle(item.id);
-                }}
-              >
-                <Ionicons name="heart" size={18} color={Colors.danger} />
-              </Pressable>
-            </Pressable>
-          )}
+            );
+          }}
         />
       )}
     </SafeAreaView>
@@ -118,27 +119,55 @@ export default function SavedFavourites() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.surface },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md },
-  backBtn: { width: 36, height: 36, borderRadius: Radius.sm, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center', ...Shadow.sm },
-  title: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
+  container: { flex: 1, backgroundColor: '#F2F3F5' },
 
-  sectionLabel: { fontFamily: FontFamily.semiBold, fontSize: FontSize.xs, color: Colors.textMuted, letterSpacing: 0.8, paddingHorizontal: Spacing.xxl, paddingTop: Spacing.lg, paddingBottom: Spacing.sm, backgroundColor: Colors.background },
+  list: { paddingHorizontal: Spacing.lg, paddingBottom: 100 },
+  listHeader: { paddingTop: Spacing.md, paddingBottom: Spacing.sm },
+  countText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textMuted, letterSpacing: 0.5 },
 
-  productRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingHorizontal: Spacing.xxl, paddingVertical: Spacing.md, backgroundColor: Colors.surface },
-  rowEmoji: { fontSize: 32, width: 44 },
-  rowName: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
-  rowSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 2 },
-  productPrice: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary },
-  origPrice: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, textDecorationLine: 'line-through' },
-  heartBtn: { padding: Spacing.xs },
-  addBtn: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
-  addBtnText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textInverse },
+  card: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    gap: Spacing.md,
+    ...Shadow.sm,
+  },
+  imgBox: {
+    width: 68, height: 68,
+    borderRadius: Radius.lg,
+    backgroundColor: '#F8F9FA',
+    alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  img:   { width: 68, height: 68 },
+  emoji: { fontSize: 32 },
+
+  info:     { flex: 1 },
+  name:     { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
+  te:       { fontFamily: FontFamily.regular,  fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 1 },
+  unit:     { fontFamily: FontFamily.regular,  fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 1 },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: Spacing.xs },
+  price:    { fontFamily: FontFamily.numBold, fontSize: FontSize.md, color: Colors.primary },
+  orig:     { fontFamily: FontFamily.num, fontSize: FontSize.xs, color: Colors.textMuted, textDecorationLine: 'line-through' },
+
+  actions: { alignItems: 'center', gap: Spacing.md },
+  shareBtn: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: Colors.primaryPale,
+    alignItems: 'center', justifyContent: 'center',
+  },
 
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md, paddingHorizontal: Spacing.xxxl },
-  emptyEmoji: { fontSize: 56 },
-  emptyTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
-  emptyBody: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center' },
-  browseBtn: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingHorizontal: Spacing.xxl, paddingVertical: Spacing.md, marginTop: Spacing.sm },
+  emptyIconWrap: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: Spacing.sm,
+  },
+  emptyTitle:    { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
+  emptyBody:     { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center' },
+  browseBtn:     { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingHorizontal: Spacing.xxl, paddingVertical: Spacing.md, marginTop: Spacing.sm },
   browseBtnText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textInverse },
 });

@@ -12,6 +12,7 @@ import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
 import Divider from '../components/ui/Divider';
+import PageHeader from '../components/ui/PageHeader';
 import { api } from '../lib/api';
 
 const FAQS = [
@@ -101,14 +102,7 @@ export default function Support() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
 
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={22} color={Colors.textPrimary} />
-        </Pressable>
-        <Text style={styles.title}>Support</Text>
-        <View style={{ width: 36 }} />
-      </View>
-      <Divider />
+      <PageHeader title="Support" fallback="/(tabs)/profile" />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

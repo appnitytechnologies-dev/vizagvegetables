@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, Pressable, TextInput, ScrollView,
   Modal, Alert, Image, KeyboardAvoidingView, Platform, ActivityIndicator,
@@ -14,10 +14,11 @@ import { useDispatch, useSelector } from 'react-redux';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
-import { selectAuth, updateUserName } from '../store/authSlice';
+import { selectAuth, updateUserName, setAvatarUrl } from '../store/authSlice';
 import { AppDispatch } from '../store';
-import { api } from '../lib/api';
+import { api, uploadFile, imgUrl } from '../lib/api';
 import Divider from '../components/ui/Divider';
+import PageHeader from '../components/ui/PageHeader';
 
 function getInitials(name: string) {
   return name
@@ -90,16 +91,20 @@ export default function EditProfileScreen() {
   const [name,          setName]          = useState(auth.name || '');
   const [email,         setEmail]         = useState('');
   const [profileImage,  setProfileImage]  = useState<string | null>(null);
+  const [isNewImage,    setIsNewImage]    = useState(false);
   const [showImageMenu, setShowImageMenu] = useState(false);
   const [loading,       setLoading]       = useState(false);
   const [error,         setError]         = useState('');
 
-  /* Load email from API on mount */
-  useState(() => {
-    api.get<{ name?: string; email?: string; phone: string }>('/api/users/profile')
-      .then(data => { if (data.email) setEmail(data.email); })
+  /* Load profile (email + avatar) from API on mount */
+  useEffect(() => {
+    api.get<{ name?: string; email?: string; phone: string; avatar_url?: string | null }>('/api/users/profile')
+      .then(data => {
+        if (data.email) setEmail(data.email);
+        if (data.avatar_url) setProfileImage(imgUrl(data.avatar_url));
+      })
       .catch(() => {});
-  });
+  }, []);
 
   const requestPermission = async (type: 'camera' | 'library') => {
     if (type === 'camera') {
@@ -124,7 +129,7 @@ export default function EditProfileScreen() {
       aspect: [1, 1],
       quality: 0.8,
     });
-    if (!result.canceled) setProfileImage(result.assets[0].uri);
+    if (!result.canceled) { setProfileImage(result.assets[0].uri); setIsNewImage(true); }
   };
 
   const pickFromCamera = async () => {
@@ -139,10 +144,10 @@ export default function EditProfileScreen() {
       aspect: [1, 1],
       quality: 0.8,
     });
-    if (!result.canceled) setProfileImage(result.assets[0].uri);
+    if (!result.canceled) { setProfileImage(result.assets[0].uri); setIsNewImage(true); }
   };
 
-  const removePhoto = () => { setShowImageMenu(false); setProfileImage(null); };
+  const removePhoto = () => { setShowImageMenu(false); setProfileImage(null); setIsNewImage(false); };
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -152,6 +157,11 @@ export default function EditProfileScreen() {
     setLoading(true);
     setError('');
     try {
+      if (isNewImage && profileImage) {
+        const result = await uploadFile<{ avatar_url: string }>('/api/users/profile/photo', 'photo', profileImage);
+        await AsyncStorage.setItem('user_avatar', result.avatar_url);
+        dispatch(setAvatarUrl(imgUrl(result.avatar_url)));
+      }
       await api.put('/api/users/profile', { name: name.trim(), email: email.trim() });
       await AsyncStorage.setItem('user_name', name.trim());
       dispatch(updateUserName(name.trim()));
@@ -168,21 +178,19 @@ export default function EditProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <StatusBar style="light" />
-
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={22} color={Colors.textInverse} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
-        <Pressable onPress={handleSave} style={styles.saveBtn} disabled={loading}>
-          {loading
-            ? <ActivityIndicator size="small" color={Colors.primary} />
-            : <Text style={styles.saveBtnText}>Save</Text>
-          }
-        </Pressable>
-      </View>
+      <StatusBar style="dark" />
+      <PageHeader
+        title="Edit Profile"
+        fallback="/(tabs)/profile"
+        right={
+          <Pressable onPress={handleSave} style={styles.saveBtn} disabled={loading}>
+            {loading
+              ? <ActivityIndicator size="small" color={Colors.primary} />
+              : <Text style={styles.saveBtnText}>Save</Text>
+            }
+          </Pressable>
+        }
+      />
 
       {/* Avatar in header extension */}
       <View style={styles.avatarSection}>

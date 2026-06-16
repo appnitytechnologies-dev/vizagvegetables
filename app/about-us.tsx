@@ -8,6 +8,7 @@ import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
 import Divider from '../components/ui/Divider';
+import PageHeader from '../components/ui/PageHeader';
 
 const STATS = [
   { value: '20+',  label: 'Vegetables' },
@@ -34,14 +35,7 @@ export default function AboutUs() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
 
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={22} color={Colors.textPrimary} />
-        </Pressable>
-        <Text style={styles.title}>About Us</Text>
-        <View style={{ width: 36 }} />
-      </View>
-      <Divider />
+      <PageHeader title="About Us" fallback="/(tabs)/profile" />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
 

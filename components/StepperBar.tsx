@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
   lineDone: { backgroundColor: Colors.primary },
   circle: { width: 32, height: 32, borderRadius: Radius.full, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface, zIndex: 1, marginBottom: 4 },
   circleDone: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  num: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textMuted },
+  num: { fontFamily: FontFamily.numBold, fontSize: FontSize.sm, color: Colors.textMuted },
   numDone: { color: Colors.textInverse },
   label: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textMuted },
   labelDone: { color: Colors.textPrimary, fontFamily: FontFamily.semiBold },

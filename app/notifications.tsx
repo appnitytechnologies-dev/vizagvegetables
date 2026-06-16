@@ -10,6 +10,7 @@ import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
 import { api, ApiOrder, ApiProduct } from '../lib/api';
 import Divider from '../components/ui/Divider';
+import PageHeader from '../components/ui/PageHeader';
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface Notification {
@@ -128,24 +129,17 @@ export default function NotificationsScreen() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={22} color={Colors.textPrimary} />
-        </Pressable>
-        <View style={styles.headerCenter}>
-          <Text style={styles.title}>Notifications</Text>
-          {unreadCount > 0 && (
-            <View style={styles.countBadge}>
-              <Text style={styles.countText}>{unreadCount} new</Text>
-            </View>
-          )}
-        </View>
-        <Pressable onPress={markAllRead} style={styles.markAllBtn}>
-          <Text style={styles.markAllText}>Mark all read</Text>
-        </Pressable>
-      </View>
-      <Divider />
+      <PageHeader
+        title="Notifications"
+        fallback="/(tabs)/home"
+        right={
+          unreadCount > 0
+            ? <Pressable onPress={markAllRead} hitSlop={8}>
+                <Text style={styles.markAllText}>Mark all</Text>
+              </Pressable>
+            : undefined
+        }
+      />
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>

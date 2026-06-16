@@ -41,6 +41,15 @@
       ],
       "expo-font",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#3AA655",
+          "defaultChannel": "default",
+          "sounds": []
+        }
+      ],
+      [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Vizag Vegetables to use your location to show nearby market rates.",
