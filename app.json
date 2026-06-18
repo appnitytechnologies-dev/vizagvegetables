@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "VizagVegetables",
-    "slug": "VizagVegetables",
+    "name": "YZAG Fresh",
+    "slug": "yzag-fresh",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "vizagvegetables",
+    "scheme": "yzagfresh",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -52,8 +52,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow Vizag Vegetables to use your location to show nearby market rates.",
-          "locationWhenInUsePermission": "Allow Vizag Vegetables to use your location to show nearby market rates."
+          "locationAlwaysAndWhenInUsePermission": "Allow YZAG Fresh to use your location to show nearby market rates.",
+          "locationWhenInUsePermission": "Allow YZAG Fresh to use your location to show nearby market rates."
         }
       ]
     ],

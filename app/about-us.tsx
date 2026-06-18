@@ -24,8 +24,8 @@ const TEAM = [
 ];
 
 const LINKS = [
-  { label: 'Privacy Policy',    icon: 'shield-checkmark-outline', url: 'https://vizagvegetables.in/privacy' },
-  { label: 'Terms of Service',  icon: 'document-text-outline',    url: 'https://vizagvegetables.in/terms' },
+  { label: 'Privacy Policy',    icon: 'shield-checkmark-outline', url: 'https://yzagfresh.in/privacy' },
+  { label: 'Terms of Service',  icon: 'document-text-outline',    url: 'https://yzagfresh.in/terms' },
   { label: 'Rate the App',      icon: 'star-outline',             url: 'https://play.google.com' },
   { label: 'Follow on Instagram', icon: 'logo-instagram',         url: 'https://instagram.com' },
 ];
@@ -44,8 +44,8 @@ export default function AboutUs() {
           <View style={styles.logoWrap}>
             <Text style={styles.logoEmoji}>🥦</Text>
           </View>
-          <Text style={styles.brandName}>Vizag Vegetables</Text>
-          <Text style={styles.brandTagline}>Farm to Table · Rythu Bazar Prices</Text>
+          <Text style={styles.brandName}>YZAG Fresh</Text>
+          <Text style={styles.brandTagline}>Local. Fresh. Connected.</Text>
           <View style={styles.versionChip}>
             <Text style={styles.versionText}>Version 1.0.0</Text>
           </View>
@@ -113,7 +113,7 @@ export default function AboutUs() {
             ))}
           </View>
 
-          <Text style={styles.footer}>Made with ❤️ in Visakhapatnam{'\n'}© 2026 Vizag Vegetables. All rights reserved.</Text>
+          <Text style={styles.footer}>Made with ❤️ in Visakhapatnam{'\n'}© 2026 YZAG Fresh. All rights reserved.</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

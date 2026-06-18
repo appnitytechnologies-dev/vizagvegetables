@@ -286,7 +286,7 @@ export default function HomeScreen() {
           >
             <View style={styles.locationRow}>
               <LocationPinIcon />
-              <Text style={styles.locationBrand}>Vizag Vegetables</Text>
+              <Text style={styles.locationBrand}>YZAG Fresh</Text>
             </View>
             <View style={styles.locationRow}>
               <Text style={styles.locationSub} numberOfLines={1}>

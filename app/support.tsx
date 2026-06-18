@@ -27,7 +27,7 @@ const FAQS = [
 const CONTACTS = [
   { icon: 'call-outline',       label: 'Call Us',    sub: '+91 89195 00000',             action: () => Linking.openURL('tel:+918919500000') },
   { icon: 'chatbubble-outline', label: 'WhatsApp',   sub: 'Chat with support',           action: () => Linking.openURL('https://wa.me/918919500000') },
-  { icon: 'mail-outline',       label: 'Email Us',   sub: 'support@vizagvegetables.in',  action: () => Linking.openURL('mailto:support@vizagvegetables.in') },
+  { icon: 'mail-outline',       label: 'Email Us',   sub: 'support@yzagfresh.in',  action: () => Linking.openURL('mailto:support@yzagfresh.in') },
 ];
 
 function FAQItem({ q, a }: { q: string; a: string }) {

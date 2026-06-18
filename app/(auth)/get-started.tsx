@@ -123,7 +123,7 @@ export default function GetStarted() {
       <Animated.View entering={FadeInDown.delay(80).duration(420)} style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerEmoji}>🔥</Text>
-          <Text style={styles.headerTitle}>Vizag Vegetables</Text>
+          <Text style={styles.headerTitle}>YZAG Fresh</Text>
         </View>
         {!isLast && (
           <Pressable onPress={handleSkip} hitSlop={14}>

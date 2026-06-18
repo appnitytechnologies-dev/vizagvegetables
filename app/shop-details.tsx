@@ -41,7 +41,7 @@ export default function ShopDetails() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Share.share({
       title: product.name,
-      message: `🛒 ${product.name} — ₹${product.price}/${product.unit}\nOrder fresh from Vizag Vegetables!`,
+      message: `🛒 ${product.name} — ₹${product.price}/${product.unit}\nOrder fresh from YZAG Fresh!`,
     });
   };
 

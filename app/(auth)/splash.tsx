@@ -49,8 +49,8 @@ export default function SplashScreen() {
       </Animated.View>
 
       <Animated.View style={[styles.textWrap, textStyle]}>
-        <Text style={styles.title}>Vizag Vegetables</Text>
-        <Text style={styles.subtitleLine}>Daily Rythu Bazar Rates</Text>
+        <Text style={styles.title}>YZAG Fresh</Text>
+        <Text style={styles.subtitleLine}>Local. Fresh. Connected.</Text>
         <Text style={styles.subtitleLine}>Market Updates</Text>
       </Animated.View>
     </SafeAreaView>

@@ -91,7 +91,7 @@ async function handleShare(item: MarketRate) {
       : item.chg < 0
       ? `📉 Down ₹${Math.abs(item.chg)} from yesterday\n`
       : '') +
-    `\n🌿 Check live rates: https://vizagvegetables.app/prices`;
+    `\n🌿 Check live rates: https://yzagfresh.in/prices`;
 
   try {
     // On native, try to share with the product image

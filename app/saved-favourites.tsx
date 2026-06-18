@@ -102,7 +102,7 @@ export default function SavedFavourites() {
                     hitSlop={8}
                     onPress={() => {
                       Share.share({
-                        message: `🛒 ${item.name}\n💰 ₹${Math.round(item.price)}/${item.unit}\n\n🌿 Order fresh vegetables: https://vizagvegetables.app`,
+                        message: `🛒 ${item.name}\n💰 ₹${Math.round(item.price)}/${item.unit}\n\n🌿 Order fresh vegetables: https://yzagfresh.in`,
                       });
                     }}
                   >

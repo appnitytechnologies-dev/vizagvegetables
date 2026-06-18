@@ -221,7 +221,7 @@ export default function ProfileScreen() {
           <Text style={styles.logoutText}>Log Out</Text>
         </Pressable>
 
-        <Text style={styles.footer}>Vizag Vegetables v1.0.0 · Made with ❤️ in Vizag</Text>
+        <Text style={styles.footer}>YZAG Fresh v1.0.0 · Made with ❤️ in Vizag</Text>
       </ScrollView>
     </SafeAreaView>
   );

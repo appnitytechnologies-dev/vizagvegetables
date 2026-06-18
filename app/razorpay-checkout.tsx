@@ -56,7 +56,7 @@ function buildHtml(p: Params) {
         key:         '${p.keyId}',
         amount:      ${p.amount},
         currency:    '${p.currency}',
-        name:        'Vizag Vegetables',
+        name:        'YZAG Fresh',
         description: 'Fresh Vegetables Order',
         order_id:    '${p.rzpOrderId}',
         prefill:     { name: '${p.name.replace(/'/g, "\\'")}', contact: '${p.phone}' },

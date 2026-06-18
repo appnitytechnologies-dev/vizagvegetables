@@ -120,7 +120,7 @@ function PushRegistrar() {
 
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('default', {
-          name: 'Vizag Vegetables',
+          name: 'YZAG Fresh',
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#3AA655',
