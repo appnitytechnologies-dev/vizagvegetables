@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://43.205.232.42:3000';
 const TOKEN_KEY = 'user_token';
 
 /* ── In-memory token (sync access during session) ─────────── */
