@@ -10,19 +10,32 @@ import Animated, {
   withTiming,
   FadeInDown,
 } from 'react-native-reanimated';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
 
+const METHOD_LABELS: Record<string, string> = {
+  upi:        'UPI',
+  card:       'Credit / Debit Card',
+  netbanking: 'Net Banking',
+  cod:        'Cash on Delivery',
+};
+
 export default function OrderSuccess() {
-  const scale = useSharedValue(0);
+  const { id, method, total } = useLocalSearchParams<{ id: string; method: string; total: string }>();
+
+  const displayId  = id     ? `#${id.slice(0, 8).toUpperCase()}` : '#—';
+  const displayPay = METHOD_LABELS[method ?? ''] ?? (method ?? '—');
+  const displayAmt = total  ? `₹${total}` : '—';
+
+  const scale   = useSharedValue(0);
   const opacity = useSharedValue(0);
 
   useEffect(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    scale.value = withDelay(200, withSpring(1, { damping: 10 }));
+    scale.value   = withDelay(200, withSpring(1, { damping: 10 }));
     opacity.value = withDelay(200, withTiming(1, { duration: 400 }));
   }, []);
 
@@ -42,23 +55,27 @@ export default function OrderSuccess() {
 
         <Animated.View entering={FadeInDown.delay(500).springify()}>
           <Text style={styles.heading}>Order Placed! 🎉</Text>
-          <Text style={styles.eta}>Arriving in 45–60 mins</Text>
+          <Text style={styles.eta}>
+            {method === 'cod'
+              ? 'Pay on delivery when it arrives'
+              : 'Payment received · Arriving in 45–60 mins'}
+          </Text>
         </Animated.View>
 
         <Animated.View style={[styles.summaryCard, { opacity }]}>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryKey}>Order ID</Text>
-            <Text style={styles.summaryVal}>#VV2345</Text>
+            <Text style={styles.summaryVal}>{displayId}</Text>
           </View>
           <View style={styles.sep} />
           <View style={styles.summaryRow}>
             <Text style={styles.summaryKey}>Payment</Text>
-            <Text style={styles.summaryVal}>UPI</Text>
+            <Text style={styles.summaryVal}>{displayPay}</Text>
           </View>
           <View style={styles.sep} />
           <View style={styles.summaryRow}>
             <Text style={styles.summaryKey}>Total Paid</Text>
-            <Text style={[styles.summaryVal, { color: Colors.primary }]}>₹270</Text>
+            <Text style={[styles.summaryVal, { color: Colors.primary }]}>{displayAmt}</Text>
           </View>
         </Animated.View>
 
@@ -67,7 +84,7 @@ export default function OrderSuccess() {
             style={styles.trackBtn}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push('/order-tracking' as any);
+              router.push({ pathname: '/order-tracking', params: { id } } as any);
             }}
           >
             <Text style={styles.trackText}>Track Order</Text>

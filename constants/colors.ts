@@ -1,11 +1,11 @@
 export const Colors = {
   primary:       '#4CAF50',
-  primaryDark:   '#388E3C',
+  primaryDark:   '#53B175',
   primaryAccent: '#43A047',
   primaryLight:  '#E8F5E9',
   primaryPale:   '#F1F8F1',
 
-  background:  '#F5F7F0',
+  background:  '#F4F6F4',
   surface:     '#FFFFFF',
   surfaceAlt:  '#F8FAF8',
 

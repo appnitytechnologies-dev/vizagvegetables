@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, FlatList, Pressable,
-  ScrollView, TextInput, Dimensions,
+  ScrollView, TextInput, Dimensions, Modal, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -10,21 +10,38 @@ import { router } from 'expo-router';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius, Shadow } from '../../constants/spacing';
-import { marketRates } from '../../dummy-data/marketRates';
-import { products } from '../../dummy-data/products';
-import { user } from '../../dummy-data/user';
+import { useSelector } from 'react-redux';
+import { selectAuth } from '../../store/authSlice';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { api, ApiProduct, imgUrl } from '../../lib/api';
+
+interface MarketRate { id: string; emoji: string; name: string; te: string; today: number; prev: number; chg: number; unit: string; }
+interface ShopProduct { id: string; name: string; te: string; emoji: string; price: number; orig: number; unit: string; image_url: string | null; }
+
+function apiToRate(p: ApiProduct): MarketRate {
+  return { id: p.id, emoji: p.emoji || '🥦', name: p.name, te: p.telugu_name || '', today: p.price, prev: p.previous_price, chg: +(p.price - p.previous_price).toFixed(0), unit: p.unit };
+}
+function apiToShop(p: ApiProduct): ShopProduct {
+  return { id: p.id, name: p.name, te: p.telugu_name || '', emoji: p.emoji || '🥦', price: Math.round(p.price), orig: Math.round(p.previous_price), unit: p.unit, image_url: imgUrl(p.image_url) };
+}
 import Badge from '../../components/ui/Badge';
 import { useCart } from '../../hooks/useCart';
 import { useFavourites } from '../../hooks/useFavourites';
+import { useAuthGuard } from '../../hooks/useAuthGuard';
+import { useLocation } from '../../hooks/useLocation';
 
 const { width: SW } = Dimensions.get('window');
+const RATE_CIRCLE_COLORS = ['#FFE4E8', '#EDE4FF', '#FFE8D4', '#E4F0FF', '#E4FFE8', '#FFF4E4'];
 
 
 const BANNERS = [
-  { id: '1', emoji: '🥦', title: 'Fresh\nVegetables', subtitle: 'Farm to table daily', bg: '#E8F5E9' },
-  { id: '2', emoji: '🍅', title: 'Rythu\nBazar Rates', subtitle: 'Updated every morning', bg: '#FFF3E0' },
-  { id: '3', emoji: '🛒', title: 'Order\nOnline', subtitle: 'Delivered in 45 mins', bg: '#E3F2FD' },
+  { id: '1', bg: '#EDF8EE', leftEmojis: ['🥦', '🍅', '🧅', '🫑'] as string[], title: 'Fresh', title2: 'Vegetables', rightEmoji: '🥬' },
+  { id: '2', bg: '#FFF8E1', leftEmojis: ['⚖️', '🌾', '🥕', '💰'] as string[], title: 'Rythu Bazar', title2: 'Rates', rightEmoji: '🌿' },
+  { id: '3', bg: '#E8F4FD', leftEmojis: ['🚚', '📦', '⏱️', '✨'] as string[], title: 'Order', title2: 'Online', rightEmoji: '🛒' },
 ];
+
+const BANNER_W = SW - Spacing.lg * 2;
 
 function BannerCarousel() {
   const [active, setActive] = useState(0);
@@ -34,7 +51,7 @@ function BannerCarousel() {
     const interval = setInterval(() => {
       setActive(prev => {
         const next = (prev + 1) % BANNERS.length;
-        scrollRef.current?.scrollTo({ x: next * (SW - Spacing.lg * 2), animated: true });
+        scrollRef.current?.scrollTo({ x: next * BANNER_W, animated: true });
         return next;
       });
     }, 3500);
@@ -47,16 +64,25 @@ function BannerCarousel() {
         ref={scrollRef}
         horizontal pagingEnabled showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={e => {
-          setActive(Math.round(e.nativeEvent.contentOffset.x / (SW - Spacing.lg * 2)));
+          setActive(Math.round(e.nativeEvent.contentOffset.x / BANNER_W));
         }}
       >
         {BANNERS.map(b => (
           <View key={b.id} style={[bannerStyles.slide, { backgroundColor: b.bg }]}>
-            <Text style={bannerStyles.emoji}>{b.emoji}</Text>
-            <View>
-              <Text style={bannerStyles.title}>{b.title}</Text>
-              <Text style={bannerStyles.sub}>{b.subtitle}</Text>
+            {/* Scattered emoji cluster on the left */}
+            <View style={bannerStyles.clusterWrap}>
+              <Text style={bannerStyles.ce0}>{b.leftEmojis[0]}</Text>
+              <Text style={bannerStyles.ce1}>{b.leftEmojis[1]}</Text>
+              <Text style={bannerStyles.ce2}>{b.leftEmojis[2]}</Text>
+              <Text style={bannerStyles.ce3}>{b.leftEmojis[3]}</Text>
             </View>
+            {/* Title text */}
+            <View style={bannerStyles.textSide}>
+              <Text style={bannerStyles.bannerLine1}>{b.title}</Text>
+              <Text style={bannerStyles.bannerLine2}>{b.title2}</Text>
+            </View>
+            {/* Right decoration */}
+            <Text style={bannerStyles.rightDeco}>{b.rightEmoji}</Text>
           </View>
         ))}
       </ScrollView>
@@ -70,19 +96,24 @@ function BannerCarousel() {
 }
 
 const bannerStyles = StyleSheet.create({
-  wrap: { marginHorizontal: Spacing.lg, borderRadius: Radius.lg, overflow: 'hidden', marginBottom: Spacing.xl },
+  wrap: { marginHorizontal: Spacing.lg, borderRadius: Radius.xl, overflow: 'hidden', marginBottom: Spacing.xl },
   slide: {
-    width: SW - Spacing.lg * 2,
-    height: 120,
+    width: BANNER_W,
+    height: 148,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: Spacing.xl,
-    gap: Spacing.lg,
-    borderRadius: Radius.lg,
+    borderRadius: Radius.xl,
+    overflow: 'hidden',
   },
-  emoji: { fontSize: 52 },
-  title: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: Colors.textPrimary, letterSpacing: -0.3 },
-  sub: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary },
+  clusterWrap: { width: 118, height: 148, position: 'relative' },
+  ce0: { position: 'absolute', fontSize: 50, left: 6,  top: 8  },
+  ce1: { position: 'absolute', fontSize: 38, left: 52, top: 36 },
+  ce2: { position: 'absolute', fontSize: 30, left: 10, top: 74 },
+  ce3: { position: 'absolute', fontSize: 34, left: 58, top: 6  },
+  textSide: { flex: 1, justifyContent: 'center', paddingLeft: 4 },
+  bannerLine1: { fontFamily: FontFamily.bold, fontSize: 26, color: Colors.textPrimary, letterSpacing: -0.5 },
+  bannerLine2: { fontFamily: FontFamily.bold, fontSize: 26, color: Colors.textPrimary, letterSpacing: -0.5 },
+  rightDeco: { fontSize: 52, marginRight: 10 },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: Spacing.sm },
   dot: { width: 6, height: 6, borderRadius: 999, backgroundColor: Colors.border },
   dotActive: { backgroundColor: Colors.primary, width: 16 },
@@ -104,35 +135,61 @@ const sh = StyleSheet.create({
 });
 
 export default function HomeScreen() {
+  const auth = useSelector(selectAuth);
   const { addItem } = useCart();
   const { ids, toggle } = useFavourites();
+  const { guard } = useAuthGuard();
+  const { locationText, loading: locLoading, isCustom, setCustomLocation, resetToGPS } = useLocation();
+  const [locationModal, setLocationModal] = useState(false);
+  const [locationInput, setLocationInput] = useState('');
   const [query, setQuery] = useState('');
-  const unreadCount = 3;
+  const [rates, setRates]             = useState<MarketRate[]>([]);
+  const [allProducts, setAllProducts] = useState<ShopProduct[]>([]);
+  const unreadCount = 0;
   const today = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+  useEffect(() => {
+    // Market rates come from the market_rates table (daily Rythu Bazar wholesale prices)
+    api.get<ApiProduct[]>('/api/market-rates?limit=500')
+      .then(data => setRates(data.map(apiToRate)))
+      .catch(() => {});
+    // Shop products come from the products table (orderable items)
+    api.get<ApiProduct[]>('/api/products?limit=200')
+      .then(data => setAllProducts(data.filter(p => p.is_active).map(apiToShop)))
+      .catch(() => {});
+  }, []);
 
   const q = query.trim().toLowerCase();
   const topRates = q
-    ? marketRates.filter(r => r.name.toLowerCase().includes(q) || r.te.toLowerCase().includes(q))
-    : marketRates.slice(0, 5);
-  const favRates = marketRates.filter(r => ids.includes(r.id)).slice(0, 3);
+    ? rates.filter(r => r.name.toLowerCase().includes(q) || r.te.toLowerCase().includes(q))
+    : rates.slice(0, 5);
+  const favRates = rates.filter(r => ids.includes(r.id)).slice(0, 3);
   const shopProducts = q
-    ? products.filter(p => p.name.toLowerCase().includes(q) || p.te.toLowerCase().includes(q))
-    : products.slice(0, 4);
+    ? allProducts.filter(p => p.name.toLowerCase().includes(q) || p.te.toLowerCase().includes(q))
+    : allProducts.slice(0, 4);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="light" />
 
       {/* Green Header */}
-      <View style={styles.header}>
+      <LinearGradient colors={['#1B5E35', '#4CAF6F']} start={{ x: 0, y: 0 }} end={{ x: 0.4, y: 1 }} style={styles.header}>
         <View style={styles.headerRow1}>
-          <View style={styles.locationCol}>
+          <Pressable
+            style={styles.locationCol}
+            onPress={() => { setLocationInput(locationText); setLocationModal(true); }}
+          >
             <View style={styles.locationRow}>
               <Ionicons name="location-sharp" size={13} color={Colors.textInverse} />
               <Text style={styles.locationBrand}>Vizag Vegetables</Text>
             </View>
-            <Text style={styles.locationSub}>Gajuwaka, Nehru nagaru,....</Text>
-          </View>
+            <View style={styles.locationRow}>
+              <Text style={styles.locationSub} numberOfLines={1}>
+                {locLoading ? '...' : (locationText || 'Set location')}
+              </Text>
+              <Ionicons name="chevron-down" size={11} color={Colors.textInverse} style={{ opacity: 0.7, marginLeft: 2, marginTop: 1 }} />
+            </View>
+          </Pressable>
           <Pressable style={styles.bellBtn} onPress={() => router.push('/notifications' as any)}>
             <Ionicons name="notifications-outline" size={22} color={Colors.textInverse} />
             {unreadCount > 0 && (
@@ -143,7 +200,7 @@ export default function HomeScreen() {
           </Pressable>
         </View>
         <View style={styles.headerRow2}>
-          <Text style={styles.greeting}>Hey {user.name} 👋</Text>
+          <Text style={styles.greeting}>Hey {auth.name || 'there'} 👋</Text>
           <Text style={styles.date}>{today}</Text>
         </View>
         <View style={styles.searchBar}>
@@ -163,7 +220,7 @@ export default function HomeScreen() {
             </Pressable>
           )}
         </View>
-      </View>
+      </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         <View style={{ height: Spacing.xl }} />
@@ -178,19 +235,19 @@ export default function HomeScreen() {
           showsHorizontalScrollIndicator={false}
           keyExtractor={i => i.id}
           contentContainerStyle={{ paddingHorizontal: Spacing.lg, gap: Spacing.md, paddingBottom: Spacing.sm }}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <Pressable
               style={rateCard.card}
-              onPress={() => toggle(item.id)}
+              onPress={() => guard({ type: 'TOGGLE_FAVOURITE', payload: item.id, returnTo: '/(tabs)/home' }, () => toggle(item.id))}
             >
-              <Pressable onPress={() => toggle(item.id)} style={rateCard.heart}>
+              <Pressable onPress={() => guard({ type: 'TOGGLE_FAVOURITE', payload: item.id, returnTo: '/(tabs)/home' }, () => toggle(item.id))} style={rateCard.heart}>
                 <Ionicons
                   name={ids.includes(item.id) ? 'heart' : 'heart-outline'}
                   size={16}
                   color={ids.includes(item.id) ? Colors.danger : Colors.textMuted}
                 />
               </Pressable>
-              <View style={rateCard.emojiCircle}>
+              <View style={[rateCard.emojiCircle, { backgroundColor: RATE_CIRCLE_COLORS[index % RATE_CIRCLE_COLORS.length] }]}>
                 <Text style={rateCard.emoji}>{item.emoji}</Text>
               </View>
               <Text style={rateCard.name}>{item.name}</Text>
@@ -220,10 +277,7 @@ export default function HomeScreen() {
                     <Text style={favStyles.name}>{r.name}</Text>
                     <Text style={favStyles.te}>{r.te}</Text>
                   </View>
-                  <View style={favStyles.priceWrap}>
-                    <Text style={favStyles.price}>₹{r.today}/{r.unit}</Text>
-                    <Badge chg={r.chg} />
-                  </View>
+                  <Text style={favStyles.price}>₹{r.today}/{r.unit}</Text>
                 </View>
               </View>
             ))}
@@ -238,25 +292,28 @@ export default function HomeScreen() {
           numColumns={2}
           scrollEnabled={false}
           keyExtractor={i => i.id}
-          columnWrapperStyle={{ gap: Spacing.md, paddingHorizontal: Spacing.lg }}
+          columnWrapperStyle={{ gap: Spacing.sm, paddingHorizontal: Spacing.md }}
           contentContainerStyle={{ gap: Spacing.md }}
           renderItem={({ item }) => (
-            <Pressable style={prodCard.card} onPress={() => router.push('/shop-details' as any)}>
-              <View style={prodCard.photoArea}>
-                <Text style={prodCard.emoji}>{item.emoji}</Text>
-              </View>
+            <Pressable style={prodCard.card} onPress={() => router.push({ pathname: '/shop-details', params: { id: item.id } } as any)}>
+              {item.image_url
+                ? <Image source={{ uri: item.image_url }} style={prodCard.photo} contentFit="cover" />
+                : <View style={prodCard.photoArea}><Text style={prodCard.emoji}>{item.emoji}</Text></View>
+              }
               <View style={prodCard.info}>
-                <Text style={prodCard.name}>{item.name}</Text>
-                <Text style={prodCard.te}>{item.te}</Text>
-                <Text style={prodCard.weight}>{item.weight}</Text>
+                <Text style={prodCard.name} numberOfLines={1}>{item.name}</Text>
+                <Text style={prodCard.unit}>{item.unit}</Text>
                 <View style={prodCard.footer}>
                   <View style={prodCard.priceRow}>
                     <Text style={prodCard.price}>₹{item.price}</Text>
-                    <Text style={prodCard.orig}>₹{item.orig}</Text>
+                    {item.orig > item.price && <Text style={prodCard.orig}>₹{item.orig}</Text>}
                   </View>
                   <Pressable
                     style={prodCard.addBtn}
-                    onPress={() => addItem({ id: item.id, name: item.name, te: item.te, emoji: item.emoji, price: item.price, weight: item.weight, quantity: 1 })}
+                    onPress={() => guard(
+                      { type: 'ADD_TO_CART', payload: { id: item.id, name: item.name, te: item.te, emoji: item.emoji, price: item.price, unit: item.unit, quantity: 1 }, returnTo: '/(tabs)/home' },
+                      () => addItem({ id: item.id, name: item.name, te: item.te, emoji: item.emoji, price: item.price, unit: item.unit, quantity: 1 })
+                    )}
                   >
                     <Text style={prodCard.addText}>Add</Text>
                   </Pressable>
@@ -276,7 +333,7 @@ export default function HomeScreen() {
             <Text style={tableStyles.col}>Prev</Text>
             <Text style={tableStyles.col}>Chg</Text>
           </View>
-          {marketRates.slice(0, 8).map(r => (
+          {rates.slice(0, 8).map(r => (
             <View key={r.id} style={tableStyles.row}>
               <View style={[tableStyles.itemCol, { flex: 2 }]}>
                 <Text style={tableStyles.itemEmoji}>{r.emoji}</Text>
@@ -289,6 +346,43 @@ export default function HomeScreen() {
           ))}
         </View>
       </ScrollView>
+
+      {/* Location picker modal */}
+      <Modal visible={locationModal} transparent animationType="fade" onRequestClose={() => setLocationModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={locModal.overlay}>
+          <Pressable style={locModal.backdrop} onPress={() => setLocationModal(false)} />
+          <View style={locModal.sheet}>
+            <Text style={locModal.title}>Set your area</Text>
+            <Text style={locModal.sub}>Type your neighbourhood, area or city name</Text>
+            <TextInput
+              style={locModal.input}
+              placeholder="e.g. Gajuwaka, Vizag"
+              placeholderTextColor={Colors.textMuted}
+              value={locationInput}
+              onChangeText={setLocationInput}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                if (locationInput.trim()) { setCustomLocation(locationInput.trim()); setLocationModal(false); }
+              }}
+            />
+            <Pressable
+              style={[locModal.saveBtn, !locationInput.trim() && locModal.saveBtnDisabled]}
+              onPress={() => {
+                if (locationInput.trim()) { setCustomLocation(locationInput.trim()); setLocationModal(false); }
+              }}
+            >
+              <Text style={locModal.saveBtnText}>Save</Text>
+            </Pressable>
+            {!isCustom ? null : (
+              <Pressable style={locModal.gpsBtn} onPress={() => { resetToGPS(); setLocationModal(false); }}>
+                <Ionicons name="locate-outline" size={14} color={Colors.primary} />
+                <Text style={locModal.gpsBtnText}>Use GPS instead</Text>
+              </Pressable>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -296,7 +390,7 @@ export default function HomeScreen() {
 const rateCard = StyleSheet.create({
   card: { width: 120, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.md, ...Shadow.sm },
   heart: { alignSelf: 'flex-end', marginBottom: Spacing.xs },
-  emojiCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: Spacing.sm },
+  emojiCircle: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: Spacing.sm },
   emoji: { fontSize: 30 },
   name: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
   te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.xs },
@@ -312,23 +406,22 @@ const favStyles = StyleSheet.create({
   emoji: { fontSize: 22 },
   name: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
   te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted },
-  priceWrap: { alignItems: 'flex-end', gap: 4 },
-  price: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary },
+  price: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary, marginLeft: 'auto' },
 });
 
 const prodCard = StyleSheet.create({
-  card: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm },
-  photoArea: { height: 120, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center' },
-  emoji: { fontSize: 50 },
-  info: { padding: Spacing.md },
-  name: { fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary, marginBottom: 2 },
-  te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: 2 },
-  weight: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginBottom: Spacing.sm },
-  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  card: { flex: 1, backgroundColor: Colors.surface, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.md },
+  photo: { width: '100%', height: 155 },
+  photoArea: { height: 155, backgroundColor: '#F5F5F0', alignItems: 'center', justifyContent: 'center' },
+  emoji: { fontSize: 56 },
+  info: { padding: 10, gap: Spacing.xs },
+  name: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary },
+  unit: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted },
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.sm },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
-  price: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary },
+  price: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
   orig: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, textDecorationLine: 'line-through' },
-  addBtn: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  addBtn: { width: 72, height: 36, backgroundColor: Colors.primaryDark, borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center' },
   addText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textInverse },
 });
 
@@ -343,6 +436,20 @@ const tableStyles = StyleSheet.create({
   today: { flex: 1, fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary, textAlign: 'center' },
   prev: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center' },
   chgCell: { flex: 1, alignItems: 'center' },
+});
+
+const locModal = StyleSheet.create({
+  overlay: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: Colors.overlay },
+  sheet: { backgroundColor: Colors.surface, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.xxl, gap: Spacing.md, paddingBottom: Spacing.xxxl },
+  title: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
+  sub: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, marginBottom: Spacing.xs },
+  input: { borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.full, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, fontFamily: FontFamily.regular, fontSize: FontSize.md, color: Colors.textPrimary },
+  saveBtn: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingVertical: Spacing.lg, alignItems: 'center' },
+  saveBtnDisabled: { opacity: 0.4 },
+  saveBtnText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.md, color: Colors.textInverse },
+  gpsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, paddingVertical: Spacing.sm },
+  gpsBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary },
 });
 
 const styles = StyleSheet.create({

@@ -2,13 +2,27 @@ import { View, Text, StyleSheet, Pressable, ScrollView, Switch } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+import { useDispatch, useSelector } from 'react-redux';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius, Shadow } from '../../constants/spacing';
-import { user } from '../../dummy-data/user';
+import { selectAuth, logout as logoutAction } from '../../store/authSlice';
+import { clearToken, api, ApiOrder } from '../../lib/api';
+import { useFavourites } from '../../hooks/useFavourites';
+import { clearFavourites } from '../../store/favouritesSlice';
+import { AppDispatch } from '../../store';
+
+function getInitials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0].toUpperCase())
+    .join('');
+}
 
 function SettingRow({ icon, label, badge, onPress, showArrow = true }: {
   icon: string; label: string; badge?: number; onPress?: () => void; showArrow?: boolean;
@@ -58,6 +72,28 @@ const row = StyleSheet.create({
 });
 
 export default function ProfileScreen() {
+  const auth     = useSelector(selectAuth);
+  const dispatch = useDispatch<AppDispatch>();
+  const { ids }  = useFavourites();
+  const [orderCount, setOrderCount] = useState(0);
+
+  const initials = getInitials(auth.name) || 'U';
+
+  useEffect(() => {
+    if (!auth.isLoggedIn) return;
+    api.get<ApiOrder[]>('/api/orders/my')
+      .then(orders => setOrderCount(orders.length))
+      .catch(() => {});
+  }, [auth.isLoggedIn]);
+
+  const handleLogout = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await clearToken();
+    dispatch(logoutAction());
+    dispatch(clearFavourites());
+    router.replace('/(auth)/get-started' as any);
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="light" />
@@ -65,20 +101,21 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Hero */}
         <View style={styles.hero}>
-          <View style={styles.avatarWrap}>
-            <Text style={styles.avatarText}>{user.initials}</Text>
-            <Pressable style={styles.editBtn}>
+          <Pressable
+            style={styles.avatarWrap}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/edit-profile' as any); }}
+          >
+            <Text style={styles.avatarText}>{initials}</Text>
+            <View style={styles.editBtn}>
               <Ionicons name="pencil" size={12} color={Colors.textInverse} />
-            </Pressable>
-          </View>
-          <Text style={styles.name}>{user.name}</Text>
-          <Text style={styles.phone}>{user.phone}</Text>
+            </View>
+          </Pressable>
+          <Text style={styles.name}>{auth.name || 'My Account'}</Text>
+          <Text style={styles.phone}>{auth.phone ? `+91 ${auth.phone}` : ''}</Text>
           <View style={styles.statsPill}>
-            <Text style={styles.statsText}>{user.orders} Orders</Text>
+            <Text style={styles.statsText}>{orderCount} Orders</Text>
             <View style={styles.statsDot} />
-            <Text style={styles.statsText}>{user.favourites} Favourites</Text>
-            <View style={styles.statsDot} />
-            <Text style={styles.statsText}>{user.addresses.length} Addresses</Text>
+            <Text style={styles.statsText}>{ids.length} Favourites</Text>
           </View>
         </View>
 
@@ -86,7 +123,9 @@ export default function ProfileScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>MY ACCOUNT</Text>
           <View style={styles.sep} />
-          <SettingRow icon="receipt-outline" label="My Orders" badge={2} onPress={() => router.push('/my-orders' as any)} />
+          <SettingRow icon="person-outline" label="Edit Profile" onPress={() => router.push('/edit-profile' as any)} />
+          <View style={styles.sep} />
+          <SettingRow icon="receipt-outline" label="My Orders" badge={orderCount} onPress={() => router.push('/my-orders' as any)} />
           <View style={styles.sep} />
           <SettingRow icon="heart-outline" label="Saved Favourites" onPress={() => router.push('/saved-favourites' as any)} />
           <View style={styles.sep} />
@@ -114,13 +153,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Logout */}
-        <Pressable
-          style={styles.logoutBtn}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            router.replace('/(auth)/get-started' as any);
-          }}
-        >
+        <Pressable style={styles.logoutBtn} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={18} color={Colors.danger} />
           <Text style={styles.logoutText}>Log Out</Text>
         </Pressable>
@@ -134,9 +167,16 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   hero: { backgroundColor: Colors.primary, alignItems: 'center', paddingVertical: Spacing.xxxl, paddingHorizontal: Spacing.xxl },
-  avatarWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.md, position: 'relative' },
+  avatarWrap: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center',
+    marginBottom: Spacing.md, position: 'relative', overflow: 'hidden',
+  },
   avatarText: { fontFamily: FontFamily.bold, fontSize: FontSize.xxl, color: Colors.textInverse },
-  editBtn: { position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12, backgroundColor: Colors.primaryAccent, alignItems: 'center', justifyContent: 'center' },
+  editBtn: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)', paddingVertical: 5, alignItems: 'center',
+  },
   name: { fontFamily: FontFamily.bold, fontSize: FontSize.xl, color: Colors.textInverse, marginBottom: 4 },
   phone: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.8)', marginBottom: Spacing.lg },
   statsPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: Radius.full, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, gap: Spacing.sm },

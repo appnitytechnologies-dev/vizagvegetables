@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Text, StyleSheet } from 'react-native';
+import { Text, StyleSheet, Image } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -11,7 +11,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
-import { Spacing } from '../../constants/spacing';
 
 export default function SplashScreen() {
   const scale = useSharedValue(0.6);
@@ -42,7 +41,11 @@ export default function SplashScreen() {
       <StatusBar style="light" />
 
       <Animated.View style={[styles.logoWrap, logoStyle]}>
-        <Text style={styles.logoText}>VV</Text>
+        <Image
+          source={require('../../assets/images/splash-icon.png')}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
       </Animated.View>
 
       <Animated.View style={[styles.textWrap, textStyle]}>
@@ -57,22 +60,18 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryDark,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: Spacing.xxl,
   },
   logoWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 32,
+    marginBottom: 18,
   },
-  logoText: {
-    fontFamily: FontFamily.bold,
-    fontSize: 96,
-    color: Colors.textInverse,
-    letterSpacing: -4,
-    lineHeight: 100,
+  logoImage: {
+    width: 180,
+    height: 160,
   },
   textWrap: {
     alignItems: 'center',
@@ -82,12 +81,12 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xxl,
     color: Colors.textInverse,
     letterSpacing: -0.3,
-    marginBottom: Spacing.md,
+    marginBottom: 56,
   },
   subtitleLine: {
     fontFamily: FontFamily.regular,
     fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.75)',
+    color: '#93FFBA',
     letterSpacing: 2,
     textAlign: 'center',
     lineHeight: 22,

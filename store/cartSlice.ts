@@ -7,7 +7,7 @@ export interface CartItem {
   te: string;
   emoji: string;
   price: number;
-  weight: string;
+  unit: string;
   quantity: number;
 }
 
