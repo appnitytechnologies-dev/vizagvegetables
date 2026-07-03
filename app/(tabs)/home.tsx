@@ -286,7 +286,7 @@ export default function HomeScreen() {
           >
             <View style={styles.locationRow}>
               <LocationPinIcon />
-              <Text style={styles.locationBrand}>YZAG Fresh</Text>
+              <Image source={require('../../assets/images/logo.jpeg')} style={styles.headerLogo} contentFit="contain" />
             </View>
             <View style={styles.locationRow}>
               <Text style={styles.locationSub} numberOfLines={1}>
@@ -598,6 +598,7 @@ const styles = StyleSheet.create({
   locationCol: { flexDirection: 'column', gap: 2 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   locationBrand: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textInverse },
+  headerLogo: { width: 90, height: 28 },
   locationSub: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)', paddingLeft: 17 },
   bellBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', position: 'relative' },
   bellBadge: { position: 'absolute', top: -2, right: -2, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: Colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },

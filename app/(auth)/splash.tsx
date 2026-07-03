@@ -49,7 +49,11 @@ export default function SplashScreen() {
       </Animated.View>
 
       <Animated.View style={[styles.textWrap, textStyle]}>
-        <Text style={styles.title}>YZAG Fresh</Text>
+        <Image
+          source={require('../../assets/images/logo.jpeg')}
+          style={styles.logoText}
+          resizeMode="contain"
+        />
         <Text style={styles.subtitleLine}>Local. Fresh. Connected.</Text>
         <Text style={styles.subtitleLine}>Market Updates</Text>
       </Animated.View>
@@ -76,12 +80,10 @@ const styles = StyleSheet.create({
   textWrap: {
     alignItems: 'center',
   },
-  title: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.xxl,
-    color: Colors.textInverse,
-    letterSpacing: -0.3,
-    marginBottom: 56,
+  logoText: {
+    width: 200,
+    height: 80,
+    marginBottom: 16,
   },
   subtitleLine: {
     fontFamily: FontFamily.regular,
