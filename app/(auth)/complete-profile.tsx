@@ -21,7 +21,7 @@ import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius } from '../../constants/spacing';
 import { AppDispatch } from '../../store';
 import { setProfile, selectPendingAction, logout } from '../../store/authSlice';
-import { api, clearToken } from '../../lib/api';
+import { api, setToken, clearToken } from '../../lib/api';
 import { finishLogin } from '../../lib/authFlow';
 
 export default function CompleteProfile() {
@@ -54,10 +54,12 @@ export default function CompleteProfile() {
     setLoading(true);
     setError('');
     try {
-      const res = await api.put<{ id: string; phone: string; name: string }>('/api/users/profile', {
+      const res = await api.put<{ id: string; phone: string; name: string; token: string }>('/api/users/profile', {
         name: name.trim(),
         phone,
       });
+      // Phone changed — persist the fresh token so relaunch doesn't see a stale "no phone" claim
+      await setToken(res.token);
       dispatch(setProfile({ name: res.name, phone: res.phone }));
       await finishLogin(dispatch, pendingAction);
     } catch (e: any) {
