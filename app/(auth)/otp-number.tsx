@@ -18,16 +18,17 @@ import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { AntDesign } from '@expo/vector-icons';
 import Svg, { Circle, Path, Rect, G, Ellipse } from 'react-native-svg';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius } from '../../constants/spacing';
 import { AppDispatch } from '../../store';
-import { loginSuccess, setGuest } from '../../store/authSlice';
+import { loginSuccess, setGuest, selectPendingAction } from '../../store/authSlice';
 import { clearFavourites } from '../../store/favouritesSlice';
 import { api, setToken } from '../../lib/api';
+import { finishLogin } from '../../lib/authFlow';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -278,14 +279,35 @@ function WaveTransition() {
   );
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+ * LEGACY: phone number + OTP login. Disabled — Google login is now the only
+ * sign-in method (see OtpNumber below). Kept here for future re-enablement:
+ *
+ *   const [phone, setPhone] = useState('');
+ *   const [loading, setLoading] = useState(false);
+ *   const isValid = phone.length === 10;
+ *
+ *   const handleSendOtp = async () => {
+ *     if (!isValid || loading) return;
+ *     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+ *     setLoading(true);
+ *     setError('');
+ *     try {
+ *       await api.post('/api/auth/send-otp', { phone });
+ *       router.push({ pathname: '/(auth)/otp-verify', params: { phone } });
+ *     } catch (e: any) {
+ *       setError(e.message || 'Failed to send OTP. Please try again.');
+ *     } finally {
+ *       setLoading(false);
+ *     }
+ *   };
+ * ───────────────────────────────────────────────────────────────────────── */
+
 export default function OtpNumber() {
-  const [phone,         setPhone]         = useState('');
-  const [loading,       setLoading]       = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error,         setError]         = useState('');
   const dispatch = useDispatch<AppDispatch>();
-
-  const isValid = phone.length === 10;
+  const pendingAction = useSelector(selectPendingAction);
 
   const [, googleResponse, googlePrompt] = Google.useAuthRequest({
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
@@ -302,12 +324,21 @@ export default function OtpNumber() {
       setGoogleLoading(true);
       setError('');
       try {
-        const res = await api.post<{ token: string; user: { id: string; phone: string; name: string } }>(
-          '/api/auth/google', { accessToken }
-        );
+        const res = await api.post<{
+          token: string;
+          user: { id: string; phone: string; name: string };
+          isNewUser: boolean;
+          needsProfile: boolean;
+        }>('/api/auth/google', { accessToken });
+
         await setToken(res.token);
-        dispatch(loginSuccess({ token: res.token, id: res.user.id, phone: res.user.phone || '', name: res.user.name || 'User' }));
-        router.replace('/(tabs)/home');
+        dispatch(loginSuccess({ token: res.token, id: res.user.id, phone: res.user.phone || '', name: res.user.name || '' }));
+
+        if (res.needsProfile) {
+          router.replace({ pathname: '/(auth)/complete-profile', params: { name: res.user.name || '' } });
+        } else {
+          await finishLogin(dispatch, pendingAction);
+        }
       } catch (e: any) {
         setError(e.message || 'Google sign-in failed. Please try again.');
       } finally {
@@ -332,21 +363,6 @@ export default function OtpNumber() {
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     googlePrompt();
-  };
-
-  const handleSendOtp = async () => {
-    if (!isValid || loading) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setLoading(true);
-    setError('');
-    try {
-      await api.post('/api/auth/send-otp', { phone });
-      router.push({ pathname: '/(auth)/otp-verify', params: { phone } });
-    } catch (e: any) {
-      setError(e.message || 'Failed to send OTP. Please try again.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleSkip = () => {
@@ -381,42 +397,10 @@ export default function OtpNumber() {
             {/* All form elements flow top-to-bottom with uniform gap */}
             <View style={styles.form}>
 
-              {/* Phone input */}
-              <View style={styles.inputRow}>
-                <Text style={styles.prefix}>+91</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="9999999999"
-                  placeholderTextColor={Colors.textMuted}
-                  keyboardType="phone-pad"
-                  maxLength={10}
-                  value={phone}
-                  onChangeText={t => { setPhone(t); setError(''); }}
-                  autoFocus
-                  returnKeyType="done"
-                  onSubmitEditing={handleSendOtp}
-                />
-              </View>
+              {/* LEGACY phone input + Send OTP button removed — see the
+                  commented-out block above OtpNumber for the original code. */}
 
               {!!error && <Text style={styles.errorText}>{error}</Text>}
-
-              {/* Send OTP */}
-              <Pressable
-                style={[styles.sendBtn, (!isValid || loading) && styles.sendBtnDisabled]}
-                onPress={handleSendOtp}
-              >
-                {loading
-                  ? <ActivityIndicator color={Colors.textInverse} size="small" />
-                  : <Text style={styles.sendBtnText}>Send OTP</Text>
-                }
-              </Pressable>
-
-              {/* Or login with */}
-              <View style={styles.orRow}>
-                <View style={styles.orLine} />
-                <Text style={styles.orText}>Or login with</Text>
-                <View style={styles.orLine} />
-              </View>
 
               {/* Google — icon pinned left, text centered */}
               <Pressable

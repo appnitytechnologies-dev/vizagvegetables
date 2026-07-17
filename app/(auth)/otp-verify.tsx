@@ -1,3 +1,5 @@
+// LEGACY: phone-OTP verification screen. Not currently reachable — login is
+// Google-only now (see otp-number.tsx). Kept for future re-enablement.
 import { useState, useRef, useEffect } from 'react';
 import {
   View,

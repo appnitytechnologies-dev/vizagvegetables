@@ -68,6 +68,10 @@ const authSlice = createSlice({
     updateUserName(state, action: PayloadAction<string>) {
       state.name = action.payload;
     },
+    setProfile(state, action: PayloadAction<{ name: string; phone: string }>) {
+      state.name  = action.payload.name;
+      state.phone = action.payload.phone;
+    },
     setAvatarUrl(state, action: PayloadAction<string | null>) {
       state.avatarUrl = action.payload;
     },
@@ -78,7 +82,7 @@ export const {
   loginSuccess, logout,
   setGuest, setLoggedIn,
   setPendingAction, clearPendingAction,
-  updateUserName, setAvatarUrl,
+  updateUserName, setProfile, setAvatarUrl,
 } = authSlice.actions;
 
 export const selectAuth          = (s: { auth: AuthState }) => s.auth;
