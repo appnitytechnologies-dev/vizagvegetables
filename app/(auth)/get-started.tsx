@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -19,9 +19,11 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from 'react-native-reanimated';
+import { useSelector } from 'react-redux';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius, Shadow } from '../../constants/spacing';
+import { selectAuth } from '../../store/authSlice';
 import PricesIllustration from '../../components/illustrations/PricesIllustration';
 import MarketIllustration from '../../components/illustrations/MarketIllustration';
 import DeliveryIllustration from '../../components/illustrations/DeliveryIllustration';
@@ -78,6 +80,15 @@ export default function GetStarted() {
   const [listHeight, setListHeight] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const btnScale = useSharedValue(1);
+  const auth = useSelector(selectAuth);
+
+  // Safety net — a Google login started but never finished (phone still
+  // missing) shouldn't silently sit "logged in" with a broken account.
+  useEffect(() => {
+    if (auth.isLoggedIn && !auth.phone) {
+      router.replace('/(auth)/complete-profile' as any);
+    }
+  }, [auth.isLoggedIn, auth.phone]);
 
   const btnStyle = useAnimatedStyle(() => ({
     transform: [{ scale: btnScale.value }],

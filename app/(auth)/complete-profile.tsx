@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,9 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  BackHandler,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
@@ -19,8 +20,8 @@ import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius } from '../../constants/spacing';
 import { AppDispatch } from '../../store';
-import { setProfile, selectPendingAction } from '../../store/authSlice';
-import { api } from '../../lib/api';
+import { setProfile, selectPendingAction, logout } from '../../store/authSlice';
+import { api, clearToken } from '../../lib/api';
 import { finishLogin } from '../../lib/authFlow';
 
 export default function CompleteProfile() {
@@ -31,6 +32,19 @@ export default function CompleteProfile() {
   const [error,   setError]   = useState('');
   const dispatch = useDispatch<AppDispatch>();
   const pendingAction = useSelector(selectPendingAction);
+
+  // Phone is mandatory here — block the Android hardware back button so
+  // users can't casually back out and end up "logged in" with no phone.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => sub.remove();
+  }, []);
+
+  const handleLogoutInstead = async () => {
+    await clearToken();
+    dispatch(logout());
+    router.replace('/(auth)/get-started');
+  };
 
   const isValid = name.trim().length > 0 && phone.length === 10;
 
@@ -55,6 +69,7 @@ export default function CompleteProfile() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <Stack.Screen options={{ gestureEnabled: false }} />
       <StatusBar style="dark" />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -108,6 +123,10 @@ export default function CompleteProfile() {
                   ? <ActivityIndicator color={Colors.textInverse} size="small" />
                   : <Text style={styles.submitBtnText}>Continue</Text>
                 }
+              </Pressable>
+
+              <Pressable onPress={handleLogoutInstead} hitSlop={10} style={styles.logoutWrap}>
+                <Text style={styles.logoutText}>Not now, log out instead</Text>
               </Pressable>
             </View>
           </View>
@@ -187,5 +206,12 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
     color: Colors.textInverse,
     letterSpacing: 0.2,
+  },
+
+  logoutWrap: { alignItems: 'center', paddingTop: Spacing.xs },
+  logoutText: {
+    fontFamily: FontFamily.regular,
+    fontSize: FontSize.sm,
+    color: Colors.textMuted,
   },
 });
