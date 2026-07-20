@@ -310,7 +310,12 @@ export default function OtpNumber() {
   const pendingAction = useSelector(selectPendingAction);
 
   const [, googleResponse, googlePrompt] = Google.useAuthRequest({
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    // Android OAuth clients created after Google's 2022 policy change can't use
+    // custom URI scheme redirects (the "Custom URI scheme is not enabled for
+    // your Android client" error) -- the Web client ID isn't subject to that
+    // restriction, so it's used here for Android too. The backend already
+    // accepts logins issued under the Web client ID.
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
     iosClientId:     process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
     webClientId:     process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
     scopes:          ['openid', 'profile', 'email'],
@@ -349,7 +354,7 @@ export default function OtpNumber() {
 
   const handleGooglePress = () => {
     const configured = [
-      process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
       process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
     ].some(id => id && !id.startsWith('REPLACE_ME'));
 
