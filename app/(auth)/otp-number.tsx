@@ -16,8 +16,7 @@ import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
+import { GoogleSignin, isSuccessResponse, isErrorWithCode, statusCodes } from '@react-native-google-signin/google-signin';
 import { useDispatch, useSelector } from 'react-redux';
 import { AntDesign } from '@expo/vector-icons';
 import Svg, { Circle, Path, Rect, G, Ellipse } from 'react-native-svg';
@@ -29,8 +28,6 @@ import { loginSuccess, setGuest, selectPendingAction } from '../../store/authSli
 import { clearFavourites } from '../../store/favouritesSlice';
 import { api, setToken } from '../../lib/api';
 import { finishLogin } from '../../lib/authFlow';
-
-WebBrowser.maybeCompleteAuthSession();
 
 const { width: SW, height: SH } = Dimensions.get('window');
 // Green area height — illustration aspect ratio is 360:240 = 3:2
@@ -309,54 +306,15 @@ export default function OtpNumber() {
   const dispatch = useDispatch<AppDispatch>();
   const pendingAction = useSelector(selectPendingAction);
 
-  const [, googleResponse, googlePrompt] = Google.useAuthRequest({
-    // Android OAuth clients created after Google's 2022 policy change can't use
-    // custom URI scheme redirects (the "Custom URI scheme is not enabled for
-    // your Android client" error) -- the Web client ID isn't subject to that
-    // restriction, so it's used here for Android too. The backend already
-    // accepts logins issued under the Web client ID.
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    iosClientId:     process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    webClientId:     process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    scopes:          ['openid', 'profile', 'email'],
-  });
-
   useEffect(() => {
-    if (googleResponse?.type !== 'success') return;
-    const accessToken = googleResponse.authentication?.accessToken;
-    if (!accessToken) return;
-    (async () => {
-      setGoogleLoading(true);
-      setError('');
-      try {
-        const res = await api.post<{
-          token: string;
-          user: { id: string; phone: string; name: string };
-          isNewUser: boolean;
-          needsProfile: boolean;
-        }>('/api/auth/google', { accessToken });
+    GoogleSignin.configure({
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    });
+  }, []);
 
-        await setToken(res.token);
-        dispatch(loginSuccess({ token: res.token, id: res.user.id, phone: res.user.phone || '', name: res.user.name || '' }));
-
-        if (res.needsProfile) {
-          router.replace({ pathname: '/(auth)/complete-profile', params: { name: res.user.name || '' } });
-        } else {
-          await finishLogin(dispatch, pendingAction);
-        }
-      } catch (e: any) {
-        setError(e.message || 'Google sign-in failed. Please try again.');
-      } finally {
-        setGoogleLoading(false);
-      }
-    })();
-  }, [googleResponse]);
-
-  const handleGooglePress = () => {
-    const configured = [
-      process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-      process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    ].some(id => id && !id.startsWith('REPLACE_ME'));
+  const handleGooglePress = async () => {
+    const configured = !!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+      && !process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.startsWith('REPLACE_ME');
 
     if (!configured) {
       Alert.alert(
@@ -366,8 +324,44 @@ export default function OtpNumber() {
       );
       return;
     }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    googlePrompt();
+    setGoogleLoading(true);
+    setError('');
+    try {
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
+      if (!isSuccessResponse(response)) {
+        // user cancelled — not an error
+        return;
+      }
+      const idToken = response.data.idToken;
+      if (!idToken) throw new Error('Google did not return an ID token');
+
+      const res = await api.post<{
+        token: string;
+        user: { id: string; phone: string; name: string };
+        isNewUser: boolean;
+        needsProfile: boolean;
+      }>('/api/auth/google', { idToken });
+
+      await setToken(res.token);
+      dispatch(loginSuccess({ token: res.token, id: res.user.id, phone: res.user.phone || '', name: res.user.name || '' }));
+
+      if (res.needsProfile) {
+        router.replace({ pathname: '/(auth)/complete-profile', params: { name: res.user.name || '' } });
+      } else {
+        await finishLogin(dispatch, pendingAction);
+      }
+    } catch (e: any) {
+      if (isErrorWithCode(e) && e.code === statusCodes.SIGN_IN_CANCELLED) {
+        // user cancelled — not an error
+      } else {
+        setError(e.message || 'Google sign-in failed. Please try again.');
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   const handleSkip = () => {
