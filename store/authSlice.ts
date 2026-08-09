@@ -16,6 +16,9 @@ interface AuthState {
   token:         string;
   avatarUrl:     string | null;
   pendingAction: PendingAction;
+  /** True once the stored token has been checked on app launch (auth isn't
+   *  persisted by redux-persist, so isLoggedIn is unreliable until this flips). */
+  hydrated:      boolean;
 }
 
 const initialState: AuthState = {
@@ -27,6 +30,7 @@ const initialState: AuthState = {
   token:         '',
   avatarUrl:     null,
   pendingAction: null,
+  hydrated:      false,
 };
 
 const authSlice = createSlice({
@@ -75,6 +79,9 @@ const authSlice = createSlice({
     setAvatarUrl(state, action: PayloadAction<string | null>) {
       state.avatarUrl = action.payload;
     },
+    setHydrated(state) {
+      state.hydrated = true;
+    },
   },
 });
 
@@ -82,12 +89,13 @@ export const {
   loginSuccess, logout,
   setGuest, setLoggedIn,
   setPendingAction, clearPendingAction,
-  updateUserName, setProfile, setAvatarUrl,
+  updateUserName, setProfile, setAvatarUrl, setHydrated,
 } = authSlice.actions;
 
 export const selectAuth          = (s: { auth: AuthState }) => s.auth;
 export const selectIsGuest       = (s: { auth: AuthState }) => s.auth.isGuest;
 export const selectIsLoggedIn    = (s: { auth: AuthState }) => s.auth.isLoggedIn;
 export const selectPendingAction = (s: { auth: AuthState }) => s.auth.pendingAction;
+export const selectHydrated      = (s: { auth: AuthState }) => s.auth.hydrated;
 
 export default authSlice.reducer;

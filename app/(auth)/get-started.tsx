@@ -82,10 +82,14 @@ export default function GetStarted() {
   const btnScale = useSharedValue(1);
   const auth = useSelector(selectAuth);
 
-  // Safety net — a Google login started but never finished (phone still
-  // missing) shouldn't silently sit "logged in" with a broken account.
+  // Safety net — splash.tsx already routes a logged-in user straight past
+  // this screen, but this covers edge cases like backing out of a later
+  // screen. A Google login started but never finished (phone still missing)
+  // shouldn't silently sit "logged in" with a broken account either.
   useEffect(() => {
-    if (auth.isLoggedIn && !auth.phone) {
+    if (auth.isLoggedIn && auth.phone) {
+      router.replace('/(tabs)/home');
+    } else if (auth.isLoggedIn && !auth.phone) {
       router.replace('/(auth)/complete-profile' as any);
     }
   }, [auth.isLoggedIn, auth.phone]);

@@ -23,7 +23,7 @@ import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { store, persistor, AppDispatch } from '../store';
 import { loadToken, decodeToken, api, imgUrl } from '../lib/api';
-import { loginSuccess, setAvatarUrl, selectAuth } from '../store/authSlice';
+import { loginSuccess, setAvatarUrl, setHydrated, selectAuth } from '../store/authSlice';
 import { setFavourites } from '../store/favouritesSlice';
 import { addToCart, clearCart, selectCartItems, CartItem } from '../store/cartSlice';
 
@@ -44,34 +44,45 @@ function AuthLoader() {
   const dispatch = useDispatch<AppDispatch>();
   useEffect(() => {
     (async () => {
+      let loggedIn = false;
       try {
         const token = await loadToken();
-        if (!token) return;
-        const payload = decodeToken(token);
-        if (!payload) return;
-        const name =
-          (await AsyncStorage.getItem('user_name')) ||
-          `User ${payload.phone.slice(-4)}`;
-        dispatch(loginSuccess({ token, id: payload.id, phone: payload.phone, name }));
-        // Restore saved avatar URL (stored locally after upload)
-        const savedAvatar = await AsyncStorage.getItem('user_avatar');
-        if (savedAvatar) dispatch(setAvatarUrl(imgUrl(savedAvatar)));
-        // Load favourites from API (non-fatal if it fails)
-        try {
-          const ids = await api.get<string[]>('/api/favorites');
-          dispatch(setFavourites(ids));
-        } catch {}
-        // Load cart from API
-        try {
-          const items = await api.get<CartItem[]>('/api/cart');
-          if (items.length > 0) {
-            dispatch(clearCart());
-            items.forEach(item => dispatch(addToCart(item)));
+        if (token) {
+          const payload = decodeToken(token);
+          if (payload) {
+            const name =
+              (await AsyncStorage.getItem('user_name')) ||
+              `User ${payload.phone.slice(-4)}`;
+            dispatch(loginSuccess({ token, id: payload.id, phone: payload.phone, name }));
+            // Restore saved avatar URL (stored locally after upload)
+            const savedAvatar = await AsyncStorage.getItem('user_avatar');
+            if (savedAvatar) dispatch(setAvatarUrl(imgUrl(savedAvatar)));
+            loggedIn = true;
           }
-        } catch {}
+        }
       } catch {
         // expired / corrupt token — stay logged out
+      } finally {
+        // Auth isn't persisted by redux-persist, so screens deciding where to
+        // route on launch (splash/get-started) need to know this check is done.
+        dispatch(setHydrated());
       }
+
+      if (!loggedIn) return;
+
+      // Load favourites from API (non-fatal if it fails)
+      try {
+        const ids = await api.get<string[]>('/api/favorites');
+        dispatch(setFavourites(ids));
+      } catch {}
+      // Load cart from API
+      try {
+        const items = await api.get<CartItem[]>('/api/cart');
+        if (items.length > 0) {
+          dispatch(clearCart());
+          items.forEach(item => dispatch(addToCart(item)));
+        }
+      } catch {}
     })();
   }, [dispatch]);
   return null;
