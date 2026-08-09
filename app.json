@@ -72,7 +72,12 @@
       ],
       "./plugins/withAndroidNetwork",
       "@react-native-google-signin/google-signin",
-      "react-native-share"
+      [
+        "react-native-share",
+        {
+          "android": []
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
