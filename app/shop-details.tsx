@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Share, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -12,6 +12,7 @@ import { Spacing, Radius, Shadow } from '../constants/spacing';
 import { api, ApiProduct, imgUrl } from '../lib/api';
 import { useCart } from '../hooks/useCart';
 import { useAuthGuard } from '../hooks/useAuthGuard';
+import { shareProduct } from '../lib/share';
 import FloatingCart from '../components/ui/FloatingCart';
 
 const QTY_OPTIONS = [1, 2, 5, 10];
@@ -39,9 +40,12 @@ export default function ShopDetails() {
   const handleShare = async () => {
     if (!product) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await Share.share({
-      title: product.name,
-      message: `🛒 ${product.name} — ₹${product.price}/${product.unit}\nOrder fresh from YZAG Fresh!`,
+    await shareProduct({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      unit: product.unit,
+      imageUrl: imgUrl(product.image_url),
     });
   };
 

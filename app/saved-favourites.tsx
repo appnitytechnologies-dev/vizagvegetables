@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator, Share } from 'react-native';
+import { View, Text, StyleSheet, Pressable, FlatList, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -11,6 +11,7 @@ import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
 import { api, ApiProduct, imgUrl } from '../lib/api';
 import { useFavourites } from '../hooks/useFavourites';
+import { shareProduct } from '../lib/share';
 import PageHeader from '../components/ui/PageHeader';
 
 export default function SavedFavourites() {
@@ -101,8 +102,12 @@ export default function SavedFavourites() {
                     style={styles.shareBtn}
                     hitSlop={8}
                     onPress={() => {
-                      Share.share({
-                        message: `🛒 ${item.name}\n💰 ₹${Math.round(item.price)}/${item.unit}\n\n🌿 Order fresh vegetables: https://yzagfresh.in`,
+                      shareProduct({
+                        id: item.id,
+                        name: item.name,
+                        price: item.price,
+                        unit: item.unit,
+                        imageUrl: imgUrl(item.image_url),
                       });
                     }}
                   >

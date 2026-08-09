@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, TextInput, ScrollView, ActivityIndicator, Alert, Share, Platform, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, TextInput, ScrollView, ActivityIndicator, Alert, Dimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { File as FSFile, Paths } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -16,6 +14,7 @@ import { api, ApiProduct, imgUrl } from '../../lib/api';
 import { Image } from 'expo-image';
 import { selectAuth } from '../../store/authSlice';
 import { useFavourites } from '../../hooks/useFavourites';
+import { shareProduct } from '../../lib/share';
 import Badge from '../../components/ui/Badge';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -83,41 +82,13 @@ function ShareIcon() {
 }
 
 async function handleShare(item: MarketRate) {
-  const message =
-    `🛒 ${item.name} (${item.te})\n` +
-    `💰 ₹${item.today}/${item.unit} today at Rythu Bazar, Vizag\n` +
-    (item.chg > 0
-      ? `📈 Up ₹${item.chg} from yesterday\n`
-      : item.chg < 0
-      ? `📉 Down ₹${Math.abs(item.chg)} from yesterday\n`
-      : '') +
-    `\n🌿 Check live rates: https://yzagfresh.in/prices`;
-
-  try {
-    // On native, try to share with the product image
-    if (Platform.OS !== 'web' && item.image_url) {
-      const canShare = await Sharing.isAvailableAsync();
-      if (canShare) {
-        const ext = item.image_url.split('.').pop()?.split('?')[0] || 'jpg';
-        const localFile = await FSFile.downloadFileAsync(
-          item.image_url,
-          new FSFile(Paths.cache, `share_${item.id}.${ext}`)
-        );
-        await Sharing.shareAsync(localFile.uri, {
-          mimeType: `image/${ext === 'png' ? 'png' : 'jpeg'}`,
-          dialogTitle: message,
-          UTI: ext === 'png' ? 'public.png' : 'public.jpeg',
-        });
-        return;
-      }
-    }
-    // Web and native fallback: share text via native share sheet / navigator.share
-    await Share.share({ message });
-  } catch (err: any) {
-    if (err?.name !== 'AbortError') {
-      Alert.alert('Share failed', 'Could not share this item right now.');
-    }
-  }
+  await shareProduct({
+    id: item.id,
+    name: `${item.name} (${item.te})`,
+    price: item.today,
+    unit: item.unit,
+    imageUrl: item.image_url,
+  });
 }
 
 function PriceRowItem({ item, isFav, onToggleFav }: { item: MarketRate; isFav: boolean; onToggleFav: () => void }) {
