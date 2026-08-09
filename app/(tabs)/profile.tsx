@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useDispatch, useSelector } from 'react-redux';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius, Shadow } from '../../constants/spacing';
@@ -113,6 +114,9 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Also clear the native Google session -- otherwise Google silently
+    // reuses the last account on next login instead of showing the picker.
+    try { await GoogleSignin.signOut(); } catch {}
     await clearToken();
     dispatch(logoutAction());
     dispatch(clearFavourites());

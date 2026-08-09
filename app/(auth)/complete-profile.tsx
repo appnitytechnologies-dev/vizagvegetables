@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
 import { useDispatch, useSelector } from 'react-redux';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius } from '../../constants/spacing';
@@ -41,6 +42,7 @@ export default function CompleteProfile() {
   }, []);
 
   const handleLogoutInstead = async () => {
+    try { await GoogleSignin.signOut(); } catch {}
     await clearToken();
     dispatch(logout());
     router.replace('/(auth)/get-started');
