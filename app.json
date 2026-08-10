@@ -18,7 +18,6 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "usesCleartextTraffic": true,
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -70,7 +69,6 @@
           }
         }
       ],
-      "./plugins/withAndroidNetwork",
       "@react-native-google-signin/google-signin",
       [
         "react-native-share",
