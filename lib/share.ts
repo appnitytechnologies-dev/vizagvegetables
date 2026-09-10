@@ -1,6 +1,5 @@
 import { Platform, Share, Alert } from 'react-native';
 import { File as FSFile, Paths } from 'expo-file-system';
-import RNShare from 'react-native-share';
 
 interface ShareProductParams {
   id: string;
@@ -19,6 +18,7 @@ export async function shareProduct({ id, name, price, unit, imageUrl }: SharePro
 
   try {
     if (Platform.OS !== 'web' && imageUrl) {
+      const { default: RNShare } = await import('react-native-share');
       const ext = imageUrl.split('.').pop()?.split('?')[0] || 'jpg';
       const localFile = await FSFile.downloadFileAsync(
         imageUrl,
