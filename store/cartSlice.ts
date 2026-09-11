@@ -6,6 +6,7 @@ export interface CartItem {
   name: string;
   te: string;
   emoji: string;
+  image_url?: string | null;
   price: number;
   unit: string;
   quantity: number;
@@ -24,9 +25,9 @@ const cartSlice = createSlice({
     addToCart(state, action: PayloadAction<CartItem>) {
       const existing = state.items.find(i => i.id === action.payload.id);
       if (existing) {
-        existing.quantity += 1;
+        existing.quantity += action.payload.quantity;
       } else {
-        state.items.push({ ...action.payload, quantity: 1 });
+        state.items.push({ ...action.payload });
       }
     },
     removeFromCart(state, action: PayloadAction<string>) {
@@ -55,8 +56,7 @@ const cartSlice = createSlice({
 export const { addToCart, removeFromCart, increaseQty, decreaseQty, clearCart } = cartSlice.actions;
 
 export const selectCartItems = (state: RootState) => state.cart.items;
-export const selectCartCount = (state: RootState) =>
-  state.cart.items.reduce((sum, i) => sum + i.quantity, 0);
+export const selectCartCount = (state: RootState) => state.cart.items.length;
 export const selectCartTotal = (state: RootState) =>
   state.cart.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 export const selectItemQuantity = (id: string) => (state: RootState) =>

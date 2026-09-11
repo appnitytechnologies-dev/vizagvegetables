@@ -14,7 +14,11 @@ interface AuthState {
   phone:         string;
   name:          string;
   token:         string;
+  avatarUrl:     string | null;
   pendingAction: PendingAction;
+  /** True once the stored token has been checked on app launch (auth isn't
+   *  persisted by redux-persist, so isLoggedIn is unreliable until this flips). */
+  hydrated:      boolean;
 }
 
 const initialState: AuthState = {
@@ -24,7 +28,9 @@ const initialState: AuthState = {
   phone:         '',
   name:          '',
   token:         '',
+  avatarUrl:     null,
   pendingAction: null,
+  hydrated:      false,
 };
 
 const authSlice = createSlice({
@@ -46,9 +52,18 @@ const authSlice = createSlice({
       state.id         = '';
       state.phone      = '';
       state.name       = '';
+      state.avatarUrl  = null;
     },
     /* legacy — keep for guest browsing */
-    setGuest(state)    { state.isGuest = true; state.isLoggedIn = false; },
+    setGuest(state) {
+      state.isGuest    = true;
+      state.isLoggedIn = false;
+      state.token      = '';
+      state.id         = '';
+      state.phone      = '';
+      state.name       = '';
+      state.avatarUrl  = null;
+    },
     setLoggedIn(state) { state.isLoggedIn = true; state.isGuest = false; },
     setPendingAction(state, action: PayloadAction<PendingAction>) {
       state.pendingAction = action.payload;
@@ -57,6 +72,16 @@ const authSlice = createSlice({
     updateUserName(state, action: PayloadAction<string>) {
       state.name = action.payload;
     },
+    setProfile(state, action: PayloadAction<{ name: string; phone: string }>) {
+      state.name  = action.payload.name;
+      state.phone = action.payload.phone;
+    },
+    setAvatarUrl(state, action: PayloadAction<string | null>) {
+      state.avatarUrl = action.payload;
+    },
+    setHydrated(state) {
+      state.hydrated = true;
+    },
   },
 });
 
@@ -64,12 +89,13 @@ export const {
   loginSuccess, logout,
   setGuest, setLoggedIn,
   setPendingAction, clearPendingAction,
-  updateUserName,
+  updateUserName, setProfile, setAvatarUrl, setHydrated,
 } = authSlice.actions;
 
 export const selectAuth          = (s: { auth: AuthState }) => s.auth;
 export const selectIsGuest       = (s: { auth: AuthState }) => s.auth.isGuest;
 export const selectIsLoggedIn    = (s: { auth: AuthState }) => s.auth.isLoggedIn;
 export const selectPendingAction = (s: { auth: AuthState }) => s.auth.pendingAction;
+export const selectHydrated      = (s: { auth: AuthState }) => s.auth.hydrated;
 
 export default authSlice.reducer;

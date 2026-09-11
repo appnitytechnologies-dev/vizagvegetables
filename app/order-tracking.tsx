@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
 import { api, ApiOrder } from '../lib/api';
+import PageHeader from '../components/ui/PageHeader';
 
-/* ── Status → step index ──────────────────────────────────── */
+/* ── Status config ───────────────────────────────────────── */
 const STATUS_STEP: Record<string, number> = {
   pending:          0,
   confirmed:        1,
@@ -19,19 +21,26 @@ const STATUS_STEP: Record<string, number> = {
   cancelled:        -1,
 };
 
-const STEP_LABELS = [
-  { label: 'Order Placed',     icon: '📦' },
-  { label: 'Confirmed',        icon: '✅' },
-  { label: 'Being Packed',     icon: '🛍️'  },
-  { label: 'Out for Delivery', icon: '🛵' },
-  { label: 'Delivered',        icon: '🏠' },
+const STEPS = [
+  { short: 'Placed',    icon: '📦' },
+  { short: 'Confirmed', icon: '✅' },
+  { short: 'Packing',   icon: '🛍️' },
+  { short: 'On Way',    icon: '🛵' },
+  { short: 'Delivered', icon: '🏠' },
 ];
 
-const METHOD_LABEL: Record<string, string> = {
-  upi:        'UPI',
-  card:       'Credit / Debit Card',
-  netbanking: 'Net Banking',
-  cod:        'Cash on Delivery',
+const STATUS_INFO: Record<number, { title: string; sub: string; gradient: [string, string] }> = {
+  0: { title: 'Order Placed',       sub: "We received your order — hang tight!",          gradient: ['#1B5E35', '#2E7D32'] },
+  1: { title: 'Order Confirmed',    sub: 'Your order has been confirmed by our team.',     gradient: ['#1B5E35', '#388E3C'] },
+  2: { title: 'Being Packed',       sub: 'Packing your fresh vegetables with care.',       gradient: ['#2E7D32', '#43A047'] },
+  3: { title: 'Out for Delivery',   sub: 'Your order is on its way to you!',              gradient: ['#388E3C', '#66BB6A'] },
+  4: { title: 'Order Delivered!',   sub: 'Enjoy your fresh vegetables 🎉',                gradient: ['#2E7D32', '#43A047'] },
+};
+
+const CANCELLED_INFO = {
+  title: 'Order Cancelled',
+  sub: 'Contact support if you have any questions.',
+  gradient: ['#B71C1C', '#C62828'] as [string, string],
 };
 
 function formatDate(iso: string) {
@@ -40,6 +49,145 @@ function formatDate(iso: string) {
   } catch { return iso; }
 }
 
+const METHOD_LABEL: Record<string, string> = {
+  upi: 'UPI', card: 'Credit / Debit Card',
+  netbanking: 'Net Banking', cod: 'Cash on Delivery',
+};
+
+/* ── Hero status banner ──────────────────────────────────── */
+function StatusHero({ step, isCancelled }: { step: number; isCancelled: boolean }) {
+  const info = isCancelled ? CANCELLED_INFO : (STATUS_INFO[step] ?? STATUS_INFO[0]);
+  const icon = isCancelled ? '❌' : STEPS[step]?.icon ?? '📦';
+
+  return (
+    <LinearGradient colors={info.gradient} style={hero.wrap}>
+      <View style={hero.iconCircle}>
+        <Text style={hero.icon}>{icon}</Text>
+      </View>
+      <Text style={hero.title}>{info.title}</Text>
+      <Text style={hero.sub}>{info.sub}</Text>
+    </LinearGradient>
+  );
+}
+
+const hero = StyleSheet.create({
+  wrap: { paddingTop: Spacing.xl, paddingBottom: Spacing.xxxl, alignItems: 'center', gap: Spacing.sm },
+  iconCircle: {
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: Spacing.xs,
+  },
+  icon:  { fontSize: 36 },
+  title: { fontFamily: FontFamily.bold,    fontSize: FontSize.xl,  color: '#fff' },
+  sub:   { fontFamily: FontFamily.regular, fontSize: FontSize.sm,  color: 'rgba(255,255,255,0.85)', textAlign: 'center', paddingHorizontal: Spacing.xxxl },
+});
+
+/* ── Horizontal progress stepper ────────────────────────── */
+function ProgressStepper({ step }: { step: number }) {
+  return (
+    <View style={prog.card}>
+      <Text style={prog.heading}>Order Progress</Text>
+      <View style={prog.track}>
+        {STEPS.map((s, i) => {
+          const done   = i < step;
+          const active = i === step;
+          return (
+            <View key={s.short} style={prog.stepGroup}>
+              <View style={prog.stepCol}>
+                {/* connecting line left */}
+                {i > 0 && (
+                  <View style={[prog.lineLeft, (done || active) && prog.lineDone]} />
+                )}
+                <View style={[
+                  prog.dot,
+                  done   && prog.dotDone,
+                  active && prog.dotActive,
+                ]}>
+                  {done
+                    ? <Ionicons name="checkmark" size={11} color="#fff" />
+                    : active
+                    ? <View style={prog.innerActive} />
+                    : <View style={prog.inner} />}
+                </View>
+                {/* connecting line right */}
+                {i < STEPS.length - 1 && (
+                  <View style={[prog.lineRight, done && prog.lineDone]} />
+                )}
+              </View>
+              <Text style={[prog.label, (done || active) && prog.labelActive]} numberOfLines={2}>
+                {s.short}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const prog = StyleSheet.create({
+  card: {
+    marginHorizontal: Spacing.md, marginTop: -Spacing.xl,
+    backgroundColor: Colors.surface, borderRadius: Radius.xl,
+    padding: Spacing.lg, ...Shadow.md,
+  },
+  heading: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.lg },
+  track: { flexDirection: 'row', alignItems: 'flex-start' },
+  stepGroup: { flex: 1, alignItems: 'center' },
+  stepCol: { flexDirection: 'row', alignItems: 'center', width: '100%', justifyContent: 'center' },
+  dot: {
+    width: 22, height: 22, borderRadius: 11,
+    borderWidth: 2, borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    alignItems: 'center', justifyContent: 'center',
+    zIndex: 1,
+  },
+  dotDone:   { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  dotActive: { borderColor: Colors.primary, backgroundColor: Colors.surface },
+  inner:       { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.border },
+  innerActive: { width: 7, height: 7, borderRadius: 4, backgroundColor: Colors.primary },
+  lineLeft:  { flex: 1, height: 2, backgroundColor: Colors.border },
+  lineRight: { flex: 1, height: 2, backgroundColor: Colors.border },
+  lineDone:  { backgroundColor: Colors.primary },
+  label: {
+    marginTop: Spacing.xs, fontFamily: FontFamily.regular,
+    fontSize: 10, color: Colors.textMuted, textAlign: 'center',
+  },
+  labelActive: { color: Colors.primary, fontFamily: FontFamily.semiBold },
+});
+
+/* ── Info row helper ─────────────────────────────────────── */
+function InfoRow({ icon, label, value, last = false, valueStyle }: {
+  icon: string; label: string; value: string; last?: boolean; valueStyle?: any;
+}) {
+  return (
+    <View style={[info.row, last && { borderBottomWidth: 0 }]}>
+      <View style={info.iconBox}>
+        <Ionicons name={icon as any} size={15} color={Colors.primary} />
+      </View>
+      <Text style={info.label}>{label}</Text>
+      <Text style={[info.value, valueStyle]} numberOfLines={2}>{value}</Text>
+    </View>
+  );
+}
+
+const info = StyleSheet.create({
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border,
+  },
+  iconBox: {
+    width: 28, height: 28, borderRadius: 8,
+    backgroundColor: Colors.primaryPale,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  label: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, width: 80 },
+  value: { flex: 1, fontFamily: FontFamily.numMed, fontSize: FontSize.sm, color: Colors.textPrimary, textAlign: 'right' },
+});
+
+/* ── Screen ──────────────────────────────────────────────── */
 export default function OrderTracking() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [order,   setOrder]   = useState<ApiOrder | null>(null);
@@ -54,149 +202,92 @@ export default function OrderTracking() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const currentStep = order ? (STATUS_STEP[order.status] ?? 0) : 0;
-  const isCancelled = order?.status === 'cancelled';
+  const currentStep  = order ? (STATUS_STEP[order.status] ?? 0) : 0;
+  const isCancelled  = order?.status === 'cancelled';
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="dark" />
 
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={20} color={Colors.textPrimary} />
-        </Pressable>
-        <Text style={styles.title}>Order Tracking</Text>
-        <View style={{ width: 32 }} />
-      </View>
+      <PageHeader title="Order Tracking" fallback="/(tabs)/profile" />
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       ) : error ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md, padding: Spacing.xxl }}>
+        <View style={styles.errorState}>
           <Text style={{ fontSize: 40 }}>😕</Text>
-          <Text style={{ fontFamily: FontFamily.semiBold, fontSize: FontSize.md, color: Colors.textPrimary, textAlign: 'center' }}>{error}</Text>
+          <Text style={styles.errorText}>{error}</Text>
           <Pressable onPress={() => router.back()}>
-            <Text style={{ color: Colors.primary, fontFamily: FontFamily.medium }}>Go back</Text>
+            <Text style={styles.errorLink}>Go back</Text>
           </Pressable>
         </View>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-          {/* Map placeholder */}
-          <View style={styles.mapPlaceholder}>
-            <Text style={styles.mapEmoji}>🗺️</Text>
-            <Text style={styles.mapText}>Visakhapatnam</Text>
-            {!isCancelled && currentStep < 4 && (
-              <View style={styles.etaChip}>
-                <Text style={styles.etaText}>
-                  {currentStep < 3 ? 'Preparing' : '~30 min away'}
-                </Text>
-              </View>
-            )}
-            {currentStep === 3 && (
-              <Text style={styles.riderEmoji}>🛵</Text>
-            )}
+
+          {/* ── Status hero ── */}
+          <StatusHero step={currentStep} isCancelled={isCancelled} />
+
+          {/* ── Progress stepper (only when not cancelled) ── */}
+          {!isCancelled && <ProgressStepper step={currentStep} />}
+
+          {/* ── Cancelled card ── */}
+          {isCancelled && (
+            <View style={styles.cancelCard}>
+              <Ionicons name="close-circle" size={32} color={Colors.danger} />
+              <Text style={styles.cancelTitle}>Order Cancelled</Text>
+              <Text style={styles.cancelSub}>This order was cancelled. Please contact support if you have any questions.</Text>
+            </View>
+          )}
+
+          {/* ── Order details card ── */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Order Details</Text>
+            <InfoRow icon="receipt-outline"  label="Order"      value={`#${order!.id.slice(0, 8).toUpperCase()}`} />
+            <InfoRow icon="calendar-outline" label="Date"       value={formatDate(order!.created_at)} />
+            <InfoRow icon="time-outline"     label="Slot"       value={order!.delivery_slot} />
+            <InfoRow icon="card-outline"     label="Payment"    value={METHOD_LABEL[order!.payment_method] ?? order!.payment_method} />
+            <InfoRow icon="cash-outline"     label="Total"      value={`₹${order!.total_amount}`}
+              valueStyle={{ color: Colors.primary, fontFamily: FontFamily.bold }} />
+            <InfoRow icon="location-outline" label="Deliver to" value={order!.delivery_address} last />
           </View>
 
-          {/* Order info */}
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <Ionicons name="receipt-outline" size={16} color={Colors.primary} />
-              <Text style={styles.infoLabel}>Order</Text>
-              <Text style={styles.infoVal}>#{order!.id.slice(0, 8).toUpperCase()}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Ionicons name="calendar-outline" size={16} color={Colors.primary} />
-              <Text style={styles.infoLabel}>Date</Text>
-              <Text style={styles.infoVal}>{formatDate(order!.created_at)}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Ionicons name="location-outline" size={16} color={Colors.primary} />
-              <Text style={styles.infoLabel}>Deliver to</Text>
-              <Text style={[styles.infoVal, { flex: 1, textAlign: 'right' }]} numberOfLines={2}>
-                {order!.delivery_address}
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Ionicons name="time-outline" size={16} color={Colors.primary} />
-              <Text style={styles.infoLabel}>Slot</Text>
-              <Text style={styles.infoVal}>{order!.delivery_slot}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Ionicons name="card-outline" size={16} color={Colors.primary} />
-              <Text style={styles.infoLabel}>Payment</Text>
-              <Text style={styles.infoVal}>
-                {METHOD_LABEL[order!.payment_method] ?? order!.payment_method}
-              </Text>
-            </View>
-            <View style={[styles.infoRow, { borderBottomWidth: 0 }]}>
-              <Ionicons name="cash-outline" size={16} color={Colors.primary} />
-              <Text style={styles.infoLabel}>Total</Text>
-              <Text style={[styles.infoVal, { color: Colors.primary, fontFamily: FontFamily.bold }]}>
-                ₹{order!.total_amount}
-              </Text>
-            </View>
-          </View>
-
-          {/* Progress tracker */}
-          {isCancelled ? (
-            <View style={[styles.progressCard, { alignItems: 'center', gap: Spacing.md }]}>
-              <Text style={{ fontSize: 36 }}>❌</Text>
-              <Text style={{ fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.danger }}>
-                Order Cancelled
-              </Text>
-              <Text style={{ fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center' }}>
-                This order was cancelled. Contact support if you have questions.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.progressCard}>
-              <Text style={styles.progressTitle}>Order Progress</Text>
-              {STEP_LABELS.map((s, i) => {
-                const done   = i < currentStep;
-                const active = i === currentStep;
-                return (
-                  <View key={s.label} style={styles.step}>
-                    <View style={styles.stepLeft}>
-                      <View style={[
-                        styles.stepDot,
-                        done   && styles.stepDotDone,
-                        active && styles.stepDotActive,
-                      ]}>
-                        {done
-                          ? <Ionicons name="checkmark" size={12} color={Colors.textInverse} />
-                          : <View style={[styles.innerDot, active && styles.innerDotActive]} />}
-                      </View>
-                      {i < STEP_LABELS.length - 1 && (
-                        <View style={[styles.stepLine, done && styles.stepLineDone]} />
-                      )}
-                    </View>
-                    <View style={styles.stepContent}>
-                      <Text style={styles.stepIcon}>{s.icon}</Text>
-                      <Text style={[styles.stepLabel, (done || active) && styles.stepLabelActive]}>
-                        {s.label}
-                      </Text>
-                    </View>
+          {/* ── Items card ── */}
+          {order!.items && order!.items.length > 0 && (() => {
+            const subtotal    = order!.items!.reduce((s, i) => s + i.unit_price * i.quantity, 0);
+            const deliveryFee = Number(order!.total_amount) - subtotal;
+            return (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Items Ordered</Text>
+                {order!.items.map((item, i) => (
+                  <View key={i} style={styles.itemRow}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                    <Text style={styles.itemQty}>×{item.quantity} {item.unit}</Text>
+                    <Text style={styles.itemPrice}>₹{item.unit_price * item.quantity}</Text>
                   </View>
-                );
-              })}
-            </View>
-          )}
+                ))}
 
-          {/* Items */}
-          {order!.items && order!.items.length > 0 && (
-            <View style={styles.itemsCard}>
-              <Text style={styles.itemsTitle}>Items Ordered</Text>
-              {order!.items.map((item, i) => (
-                <View key={i} style={styles.itemRow}>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  <Text style={styles.itemQty}>×{item.quantity} {item.unit}</Text>
-                  <Text style={styles.itemPrice}>₹{item.unit_price * item.quantity}</Text>
+                {/* Bill summary */}
+                <View style={styles.billSep} />
+                <View style={styles.billRow}>
+                  <Text style={styles.billLabel}>Subtotal</Text>
+                  <Text style={styles.billVal}>₹{subtotal}</Text>
                 </View>
-              ))}
-            </View>
-          )}
+                {deliveryFee > 0 && (
+                  <View style={styles.billRow}>
+                    <Text style={styles.billLabel}>Delivery</Text>
+                    <Text style={styles.billVal}>₹{deliveryFee}</Text>
+                  </View>
+                )}
+                <View style={[styles.billRow, { marginTop: 2 }]}>
+                  <Text style={styles.billTotal}>Total</Text>
+                  <Text style={styles.billTotalVal}>₹{Number(order!.total_amount).toFixed(2)}</Text>
+                </View>
+              </View>
+            );
+          })()}
+
         </ScrollView>
       )}
     </SafeAreaView>
@@ -204,44 +295,40 @@ export default function OrderTracking() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  backBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  title: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
+  container: { flex: 1, backgroundColor: '#F2F3F5' },
 
-  mapPlaceholder: { height: 180, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, position: 'relative' },
-  mapEmoji: { fontSize: 48 },
-  mapText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary },
-  etaChip: { position: 'absolute', top: Spacing.md, right: Spacing.md, backgroundColor: Colors.primary, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
-  etaText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs, color: Colors.textInverse },
-  riderEmoji: { position: 'absolute', bottom: 40, left: '40%', fontSize: 32 },
+  errorState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.md, padding: Spacing.xxl },
+  errorText:  { fontFamily: FontFamily.semiBold, fontSize: FontSize.md, color: Colors.textPrimary, textAlign: 'center' },
+  errorLink:  { color: Colors.primary, fontFamily: FontFamily.medium },
 
-  infoCard: { marginHorizontal: Spacing.xxl, marginTop: Spacing.xxl, backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm },
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border },
-  infoLabel: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, width: 80 },
-  infoVal: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
+  cancelCard: {
+    marginHorizontal: Spacing.md, marginTop: Spacing.md,
+    backgroundColor: Colors.surface, borderRadius: Radius.xl,
+    padding: Spacing.xl, alignItems: 'center', gap: Spacing.sm,
+    ...Shadow.sm,
+  },
+  cancelTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.danger },
+  cancelSub:   { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, textAlign: 'center' },
 
-  progressCard: { margin: Spacing.xxl, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, ...Shadow.sm },
-  progressTitle: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.md },
+  card: {
+    marginHorizontal: Spacing.md, marginTop: Spacing.md,
+    backgroundColor: Colors.surface, borderRadius: Radius.xl,
+    padding: Spacing.lg, ...Shadow.sm,
+  },
+  cardTitle: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.xs },
 
-  step: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.md },
-  stepLeft: { alignItems: 'center', width: 24 },
-  stepDot: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
-  stepDotDone: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  stepDotActive: { borderColor: Colors.primary },
-  innerDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.border },
-  innerDotActive: { backgroundColor: Colors.primary },
-  stepLine: { width: 2, height: 28, backgroundColor: Colors.border, marginVertical: 2 },
-  stepLineDone: { backgroundColor: Colors.primary },
-  stepContent: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingBottom: Spacing.lg },
-  stepIcon: { fontSize: 16 },
-  stepLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textMuted, paddingTop: 2 },
-  stepLabelActive: { color: Colors.textPrimary, fontFamily: FontFamily.semiBold },
+  itemRow: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.border,
+  },
+  itemName:  { flex: 1, fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textPrimary },
+  itemQty:   { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, marginRight: Spacing.md },
+  itemPrice: { fontFamily: FontFamily.numBold, fontSize: FontSize.sm, color: Colors.textPrimary, width: 60, textAlign: 'right' },
 
-  itemsCard: { marginHorizontal: Spacing.xxl, marginBottom: Spacing.xxl, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, ...Shadow.sm, gap: Spacing.sm },
-  itemsTitle: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textSecondary, marginBottom: Spacing.xs },
-  itemRow: { flexDirection: 'row', alignItems: 'center' },
-  itemName: { flex: 1, fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textPrimary },
-  itemQty: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textMuted, marginRight: Spacing.md },
-  itemPrice: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary, width: 56, textAlign: 'right' },
+  billSep:      { height: StyleSheet.hairlineWidth, backgroundColor: Colors.border, marginVertical: Spacing.sm },
+  billRow:      { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  billLabel:    { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary },
+  billVal:      { fontFamily: FontFamily.numMed, fontSize: FontSize.sm, color: Colors.textPrimary },
+  billTotal:    { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary },
+  billTotalVal: { fontFamily: FontFamily.numBold, fontSize: FontSize.md, color: Colors.primary },
 });

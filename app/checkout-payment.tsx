@@ -17,6 +17,13 @@ import { api } from '../lib/api';
 import StepperBar from '../components/StepperBar';
 import Divider from '../components/ui/Divider';
 
+type RazorpayOrderRes = {
+  razorpay_order_id: string;
+  amount: number; // paise
+  currency: string;
+  key_id: string;
+};
+
 const DELIVERY_FEE = 30;
 
 const METHODS = [
@@ -28,11 +35,36 @@ const METHODS = [
 
 export default function CheckoutPayment() {
   const { address, slot } = useLocalSearchParams<{ address: string; slot: string }>();
-  const [method,  setMethod]   = useState('upi');
-  const [upiId,   setUpiId]    = useState('');
-  const [loading, setLoading]  = useState(false);
-  const [error,   setError]    = useState('');
-  const { items, total, count } = useCart();
+  const [method,     setMethod]     = useState('upi');
+  const [upiId,      setUpiId]      = useState('');
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState('');
+
+  /* Card details */
+  const [cardNum,    setCardNum]    = useState('');
+  const [cardName,   setCardName]   = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvv,    setCardCvv]    = useState('');
+  const [showCvv,    setShowCvv]    = useState(false);
+
+  const fmtCardNum = (v: string) => {
+    const d = v.replace(/\D/g, '').slice(0, 16);
+    return d.replace(/(.{4})(?=.)/g, '$1 ');
+  };
+  const fmtExpiry = (v: string) => {
+    const d = v.replace(/\D/g, '').slice(0, 4);
+    return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
+  };
+  const cardBrand = () => {
+    const d = cardNum.replace(/\s/g, '');
+    if (/^4/.test(d))      return 'Visa';
+    if (/^5[1-5]/.test(d)) return 'Mastercard';
+    if (/^6/.test(d))      return 'RuPay';
+    if (/^3[47]/.test(d))  return 'Amex';
+    return '';
+  };
+  const { items, total } = useCart();
+  const count = items.length;
   const dispatch = useDispatch<AppDispatch>();
   const auth     = useSelector(selectAuth);
   const delivery = total >= 500 ? 0 : DELIVERY_FEE;
@@ -44,19 +76,52 @@ export default function CheckoutPayment() {
     }
     setLoading(true);
     setError('');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    const orderItems = items.map(i => ({ product_id: i.id, quantity: i.quantity, unit_price: i.price }));
+    const grandTotal = total + delivery;
+
     try {
-      const res = await api.post<{ id: string }>('/api/orders', {
-        items:            items.map(i => ({ product_id: i.id, quantity: i.quantity, unit_price: i.price })),
-        delivery_address: address || 'N/A',
-        delivery_slot:    slot || '9 AM – 12 PM',
-        payment_method:   method,
-      });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      dispatch(clearCart());
-      router.replace({
-        pathname: '/order-success',
-        params: { id: res.id, method, total: String(total + delivery) },
-      } as any);
+      if (method === 'cod') {
+        // ── Cash on delivery — create order directly ──
+        const res = await api.post<{ id: string }>('/api/orders', {
+          items:            orderItems,
+          delivery_address: address || 'N/A',
+          delivery_slot:    slot || '9 AM – 12 PM',
+          payment_method:   'cod',
+          delivery_fee:     delivery,
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        dispatch(clearCart());
+        api.delete('/api/cart').catch(() => {});
+        router.replace({
+          pathname: '/order-success',
+          params: { id: res.id, method: 'cod', total: String(grandTotal) },
+        } as any);
+      } else {
+        // ── Online payment — open Razorpay checkout ──
+        const rzp = await api.post<RazorpayOrderRes>('/api/payments/create-order', { amount: grandTotal });
+        const orderData = {
+          items:            orderItems,
+          delivery_address: address || 'N/A',
+          delivery_slot:    slot || '9 AM – 12 PM',
+          payment_method:   method,
+          delivery_fee:     delivery,
+        };
+        router.push({
+          pathname: '/razorpay-checkout',
+          params: {
+            rzpOrderId: rzp.razorpay_order_id,
+            amount:     String(rzp.amount),
+            currency:   rzp.currency,
+            keyId:      rzp.key_id,
+            orderJson:  JSON.stringify(orderData),
+            total:      String(grandTotal),
+            name:       auth.name || '',
+            phone:      auth.phone || '',
+          },
+        } as any);
+      }
     } catch (e: any) {
       setError(e.message || 'Failed to place order. Please try again.');
     } finally {
@@ -129,14 +194,100 @@ export default function CheckoutPayment() {
                 />
               </View>
             )}
+
+            {method === 'card' && m.id === 'card' && (
+              <View style={styles.cardForm}>
+                {/* Card number */}
+                <View style={styles.cardFieldWrap}>
+                  <Text style={styles.cardLabel}>Card Number</Text>
+                  <View style={styles.cardInputRow}>
+                    <Ionicons name="card-outline" size={16} color={Colors.textMuted} />
+                    <TextInput
+                      style={styles.cardInput}
+                      placeholder="1234 5678 9012 3456"
+                      placeholderTextColor={Colors.textMuted}
+                      value={cardNum}
+                      onChangeText={v => setCardNum(fmtCardNum(v))}
+                      keyboardType="number-pad"
+                      maxLength={19}
+                    />
+                    {cardBrand() !== '' && (
+                      <Text style={styles.cardBrand}>{cardBrand()}</Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* Name on card */}
+                <View style={styles.cardFieldWrap}>
+                  <Text style={styles.cardLabel}>Name on Card</Text>
+                  <TextInput
+                    style={styles.cardInputFull}
+                    placeholder="RAVI KUMAR"
+                    placeholderTextColor={Colors.textMuted}
+                    value={cardName}
+                    onChangeText={v => setCardName(v.toUpperCase())}
+                    autoCapitalize="characters"
+                  />
+                </View>
+
+                {/* Expiry + CVV row */}
+                <View style={styles.cardRow}>
+                  <View style={[styles.cardFieldWrap, { flex: 1 }]}>
+                    <Text style={styles.cardLabel}>Expiry</Text>
+                    <TextInput
+                      style={styles.cardInputFull}
+                      placeholder="MM/YY"
+                      placeholderTextColor={Colors.textMuted}
+                      value={cardExpiry}
+                      onChangeText={v => setCardExpiry(fmtExpiry(v))}
+                      keyboardType="number-pad"
+                      maxLength={5}
+                    />
+                  </View>
+                  <View style={[styles.cardFieldWrap, { flex: 1 }]}>
+                    <Text style={styles.cardLabel}>CVV</Text>
+                    <View style={styles.cardInputRow}>
+                      <TextInput
+                        style={[styles.cardInput, { flex: 1 }]}
+                        placeholder="•••"
+                        placeholderTextColor={Colors.textMuted}
+                        value={cardCvv}
+                        onChangeText={v => setCardCvv(v.replace(/\D/g, ''))}
+                        keyboardType="number-pad"
+                        maxLength={4}
+                        secureTextEntry={!showCvv}
+                      />
+                      <Pressable onPress={() => setShowCvv(v => !v)} hitSlop={8}>
+                        <Ionicons name={showCvv ? 'eye-off-outline' : 'eye-outline'} size={16} color={Colors.textMuted} />
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.secureRow}>
+                  <Ionicons name="lock-closed" size={11} color={Colors.textMuted} />
+                  <Text style={styles.secureText}>Your card details are encrypted and secure</Text>
+                </View>
+              </View>
+            )}
           </View>
         ))}
 
         {/* Order summary */}
         <Text style={[styles.sectionLabel, { marginTop: Spacing.sm }]}>Order Summary</Text>
         <View style={styles.summaryCard}>
+          {/* Item breakdown */}
+          {items.map(i => (
+            <View key={i.id} style={styles.summaryRow}>
+              <Text style={styles.summaryKey} numberOfLines={1}>{i.name}</Text>
+              <Text style={styles.summaryVal}>
+                {i.quantity} {i.unit}  ×  ₹{i.price} = ₹{i.price * i.quantity}
+              </Text>
+            </View>
+          ))}
+          <View style={styles.sep} />
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryKey}>Items ({count})</Text>
+            <Text style={styles.summaryKey}>Subtotal ({count} {count === 1 ? 'item' : 'items'})</Text>
             <Text style={styles.summaryVal}>₹{total}</Text>
           </View>
           <View style={styles.summaryRow}>
@@ -197,14 +348,24 @@ const styles = StyleSheet.create({
   summaryCard: { backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, gap: Spacing.sm, ...Shadow.sm, borderWidth: 1, borderColor: Colors.border },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
   summaryKey: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary },
-  summaryVal: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textPrimary },
+  summaryVal: { fontFamily: FontFamily.numMed, fontSize: FontSize.sm, color: Colors.textPrimary },
   sep: { height: 1, backgroundColor: Colors.border },
   totalKey: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.textPrimary },
-  totalVal: { fontFamily: FontFamily.bold, fontSize: FontSize.md, color: Colors.primary },
+  totalVal: { fontFamily: FontFamily.numBold, fontSize: FontSize.md, color: Colors.primary },
   secureRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   secureText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted },
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: Colors.surface, paddingHorizontal: Spacing.xxl, paddingVertical: Spacing.lg, borderTopWidth: 1, borderTopColor: Colors.border },
   placeBtn: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingVertical: Spacing.lg, alignItems: 'center' },
   placeBtnDisabled: { opacity: 0.6 },
   placeText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.md, color: Colors.textInverse },
+
+  /* Card form */
+  cardForm: { marginTop: Spacing.xs, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: Radius.md, padding: Spacing.md, backgroundColor: Colors.surface, gap: Spacing.md },
+  cardFieldWrap: { gap: 4 },
+  cardLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textSecondary },
+  cardInputRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 10 },
+  cardInput: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textPrimary, flex: 1 },
+  cardInputFull: { borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 10, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textPrimary },
+  cardRow: { flexDirection: 'row', gap: Spacing.md },
+  cardBrand: { fontFamily: FontFamily.semiBold, fontSize: FontSize.xs, color: Colors.primary },
 });

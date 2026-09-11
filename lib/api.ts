@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.yzagfresh.com';
 const TOKEN_KEY = 'user_token';
 
 /* ── In-memory token (sync access during session) ─────────── */
@@ -53,6 +53,41 @@ export const api = {
   post:   <T>(path: string, body: unknown) => request<T>(path, { method: 'POST',   body: JSON.stringify(body) }),
   put:    <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT',    body: JSON.stringify(body) }),
   delete: <T>(path: string)               => request<T>(path, { method: 'DELETE' }),
+};
+
+/** Upload a local file URI via multipart/form-data POST.
+ *  Handles both React Native (file:// / content://) and Expo Web (blob:) URIs.
+ */
+export const uploadFile = async <T = any>(
+  path: string,
+  fieldName: string,
+  uri: string,
+  type = 'image/jpeg',
+  name = 'upload.jpg',
+): Promise<T> => {
+  const token = getToken();
+  const formData = new FormData();
+
+  if (uri.startsWith('blob:') || uri.startsWith('data:')) {
+    // Expo Web: fetch the blob and wrap in a File object
+    const blobRes = await fetch(uri);
+    const blob    = await blobRes.blob();
+    formData.append(fieldName, new File([blob], name, { type }));
+  } else {
+    // React Native (iOS / Android): native fetch handles { uri } natively
+    formData.append(fieldName, { uri, type, name } as any);
+  }
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message || 'Upload failed');
+  }
+  return res.json();
 };
 
 /* ── Shared types ─────────────────────────────────────────── */
@@ -136,6 +171,8 @@ export interface ApiMarket {
   bg_color:       string;
   facilities:     string[];
   is_active:      boolean;
+  image_folder?:  string;
+  images?:        string[];
 }
 
 export const marketApi = {

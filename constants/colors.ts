@@ -1,13 +1,13 @@
 export const Colors = {
-  primary:       '#4CAF50',
-  primaryDark:   '#53B175',
-  primaryAccent: '#43A047',
-  primaryLight:  '#E8F5E9',
-  primaryPale:   '#F1F8F1',
+  primary:        '#2E7D32',
+  primaryDark:    '#1B5E20',
+  primaryAccent:  '#16A34A',
+  primaryLight:   '#E8F5E9',
+  primaryPale:    '#F1F8F1',
 
-  background:  '#F4F6F4',
-  surface:     '#FFFFFF',
-  surfaceAlt:  '#F8FAF8',
+  background:     '#F5F7F0',
+  surface:        '#FFFFFF',
+  surfaceAlt:     '#F8FAF8',
 
   textPrimary:   '#0F172A',
   textSecondary: '#475569',

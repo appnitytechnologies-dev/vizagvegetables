@@ -3,6 +3,10 @@ export const FontFamily = {
   medium:    'DMSans_500Medium',
   semiBold:  'DMSans_600SemiBold',
   bold:      'DMSans_700Bold',
+  // Roboto — used only for numbers, prices, and ₹ symbol
+  num:       'Roboto_400Regular',
+  numMed:    'Roboto_500Medium',
+  numBold:   'Roboto_700Bold',
 };
 
 export const FontSize = {

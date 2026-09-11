@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, Pressable, ScrollView, TextInput,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -28,6 +28,37 @@ const EMPTY_FORM: FormData = {
 };
 
 type Mode = 'list' | 'add' | 'edit';
+
+/* ─── Standalone field — must live OUTSIDE AddressForm to avoid remount-on-render ── */
+function Field({
+  label, field, placeholder, keyboardType = 'default', maxLength, optional = false,
+  form, errors, set,
+}: {
+  label: string; field: keyof FormData; placeholder: string;
+  keyboardType?: any; maxLength?: number; optional?: boolean;
+  form: FormData;
+  errors: Partial<Record<keyof FormData, string>>;
+  set: (key: keyof FormData, val: string) => void;
+}) {
+  return (
+    <View style={form_.fieldWrap}>
+      <Text style={form_.label}>
+        {label} {optional && <Text style={form_.optional}>(optional)</Text>}
+      </Text>
+      <TextInput
+        style={[form_.input, errors[field] ? form_.inputError : null]}
+        placeholder={placeholder}
+        placeholderTextColor={Colors.textMuted}
+        value={String(form[field] ?? '')}
+        onChangeText={v => set(field, v)}
+        keyboardType={keyboardType}
+        maxLength={maxLength}
+        returnKeyType="next"
+      />
+      {!!errors[field] && <Text style={form_.error}>{errors[field]}</Text>}
+    </View>
+  );
+}
 
 /* ─── Address form ───────────────────────────────────── */
 function AddressForm({
@@ -66,30 +97,6 @@ function AddressForm({
     if (validate()) onSave(form);
   };
 
-  const Field = ({
-    label, field, placeholder, keyboardType = 'default', maxLength, optional = false,
-  }: {
-    label: string; field: keyof FormData; placeholder: string;
-    keyboardType?: any; maxLength?: number; optional?: boolean;
-  }) => (
-    <View style={form_.fieldWrap}>
-      <Text style={form_.label}>
-        {label} {optional && <Text style={form_.optional}>(optional)</Text>}
-      </Text>
-      <TextInput
-        style={[form_.input, errors[field] ? form_.inputError : null]}
-        placeholder={placeholder}
-        placeholderTextColor={Colors.textMuted}
-        value={String(form[field] ?? '')}
-        onChangeText={v => set(field, v)}
-        keyboardType={keyboardType}
-        maxLength={maxLength}
-        returnKeyType="next"
-      />
-      {!!errors[field] && <Text style={form_.error}>{errors[field]}</Text>}
-    </View>
-  );
-
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
@@ -117,25 +124,25 @@ function AddressForm({
         {/* Row: Name + Phone */}
         <View style={form_.row}>
           <View style={{ flex: 1 }}>
-            <Field label="Full Name" field="name" placeholder="Ravi Kumar" />
+            <Field label="Full Name" field="name" placeholder="Ravi Kumar" form={form} errors={errors} set={set} />
           </View>
           <View style={{ flex: 1 }}>
             <Field label="Mobile" field="phone" placeholder="9876543210"
-              keyboardType="phone-pad" maxLength={10} />
+              keyboardType="phone-pad" maxLength={10} form={form} errors={errors} set={set} />
           </View>
         </View>
 
-        <Field label="House / Flat / Building" field="house_no" placeholder="Flat 4B, Sunrise Apartments" />
-        <Field label="Area / Street / Locality" field="area" placeholder="MVP Colony, Near Park" />
-        <Field label="Landmark" field="landmark" placeholder="Near Government Hospital" optional />
+        <Field label="House / Flat / Building" field="house_no" placeholder="Flat 4B, Sunrise Apartments" form={form} errors={errors} set={set} />
+        <Field label="Area / Street / Locality" field="area" placeholder="MVP Colony, Near Park" form={form} errors={errors} set={set} />
+        <Field label="Landmark" field="landmark" placeholder="Near Government Hospital" optional form={form} errors={errors} set={set} />
 
         {/* Row: Pincode + City */}
         <View style={form_.row}>
           <View style={{ flex: 1 }}>
-            <Field label="Pincode" field="pincode" placeholder="530026" keyboardType="number-pad" maxLength={6} />
+            <Field label="Pincode" field="pincode" placeholder="530026" keyboardType="number-pad" maxLength={6} form={form} errors={errors} set={set} />
           </View>
           <View style={{ flex: 1 }}>
-            <Field label="City / Town" field="city" placeholder="Visakhapatnam" />
+            <Field label="City / Town" field="city" placeholder="Visakhapatnam" form={form} errors={errors} set={set} />
           </View>
         </View>
 
@@ -177,6 +184,40 @@ function AddressForm({
   );
 }
 
+const dlg = StyleSheet.create({
+  overlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  box: {
+    width: 300, backgroundColor: Colors.surface,
+    borderRadius: Radius.xl, padding: Spacing.xxl,
+    alignItems: 'center', gap: Spacing.md,
+    ...Shadow.sm,
+  },
+  iconWrap: {
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: Colors.dangerLight,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  title: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
+  body: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  bold: { fontFamily: FontFamily.semiBold, color: Colors.textPrimary },
+  btnRow: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.sm, width: '100%' },
+  cancelBtn: {
+    flex: 1, borderWidth: 1.5, borderColor: Colors.border,
+    borderRadius: Radius.full, paddingVertical: Spacing.md,
+    alignItems: 'center',
+  },
+  cancelText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textSecondary },
+  deleteBtn: {
+    flex: 1, backgroundColor: Colors.danger,
+    borderRadius: Radius.full, paddingVertical: Spacing.md,
+    alignItems: 'center',
+  },
+  deleteText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: '#fff' },
+});
+
 /* ─── Address card ───────────────────────────────────── */
 function AddressCard({
   address, onEdit, onDelete, onSetDefault,
@@ -186,6 +227,10 @@ function AddressCard({
   onDelete: () => void;
   onSetDefault: () => void;
 }) {
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const confirmDelete = () => setShowConfirm(true);
+
   const showMenu = () => {
     const options = address.is_default
       ? ['Edit', 'Delete', 'Cancel']
@@ -203,57 +248,69 @@ function AddressCard({
     })));
   };
 
-  const confirmDelete = () => {
-    Alert.alert(
-      'Delete Address',
-      `Remove "${address.label}" address?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: onDelete },
-      ]
-    );
-  };
-
   return (
-    <View style={card.container}>
-      <View style={card.top}>
-        <View style={card.labelRow}>
-          <View style={card.labelChip}>
-            <Text style={card.labelIcon}>{LABEL_ICON[address.label]}</Text>
-            <Text style={card.labelText}>{address.label.toUpperCase()}</Text>
-          </View>
-          {address.is_default && (
-            <View style={card.defaultBadge}>
-              <Text style={card.defaultText}>DEFAULT</Text>
+    <>
+      {/* Delete confirmation modal */}
+      <Modal visible={showConfirm} transparent animationType="fade" onRequestClose={() => setShowConfirm(false)}>
+        <Pressable style={dlg.overlay} onPress={() => setShowConfirm(false)}>
+          <Pressable style={dlg.box} onPress={e => e.stopPropagation()}>
+            <View style={dlg.iconWrap}>
+              <Ionicons name="trash-outline" size={28} color={Colors.danger} />
             </View>
-          )}
-        </View>
-        <Pressable onPress={showMenu} style={card.menuBtn} hitSlop={8}>
-          <Ionicons name="ellipsis-vertical" size={18} color={Colors.textMuted} />
-        </Pressable>
-      </View>
-
-      <Text style={card.name}>{address.name}  <Text style={card.phone}>{address.phone}</Text></Text>
-      <Text style={card.addressText}>{formatAddress(address)}</Text>
-
-      <View style={{ marginVertical: Spacing.sm }}><Divider /></View>
-      <View style={card.actions}>
-        <Pressable style={card.actionBtn} onPress={onEdit}>
-          <Ionicons name="pencil-outline" size={14} color={Colors.primary} />
-          <Text style={card.actionText}>Edit</Text>
-        </Pressable>
-        {!address.is_default && (
-          <Pressable style={card.actionBtn} onPress={onSetDefault}>
-            <Ionicons name="star-outline" size={14} color={Colors.primary} />
-            <Text style={card.actionText}>Set Default</Text>
+            <Text style={dlg.title}>Delete Address</Text>
+            <Text style={dlg.body}>Remove your <Text style={dlg.bold}>{address.label}</Text> address? This action cannot be undone.</Text>
+            <View style={dlg.btnRow}>
+              <Pressable style={dlg.cancelBtn} onPress={() => setShowConfirm(false)}>
+                <Text style={dlg.cancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable style={dlg.deleteBtn} onPress={() => { setShowConfirm(false); onDelete(); }}>
+                <Text style={dlg.deleteText}>Delete</Text>
+              </Pressable>
+            </View>
           </Pressable>
-        )}
-        <Pressable style={card.actionBtn} onPress={confirmDelete}>
-          <Ionicons name="trash-outline" size={14} color={Colors.danger} />
-          <Text style={[card.actionText, { color: Colors.danger }]}>Delete</Text>
         </Pressable>
+      </Modal>
+
+      <View style={card.container}>
+        <View style={card.top}>
+          <View style={card.labelRow}>
+            <View style={card.labelChip}>
+              <Text style={card.labelIcon}>{LABEL_ICON[address.label]}</Text>
+              <Text style={card.labelText}>{address.label.toUpperCase()}</Text>
+            </View>
+            {address.is_default && (
+              <View style={card.defaultBadge}>
+                <Text style={card.defaultText}>DEFAULT</Text>
+              </View>
+            )}
+          </View>
+          <Pressable onPress={showMenu} style={card.menuBtn} hitSlop={8}>
+            <Ionicons name="ellipsis-vertical" size={18} color={Colors.textMuted} />
+          </Pressable>
+        </View>
+
+        <Text style={card.name}>{address.name}  <Text style={card.phone}>{address.phone}</Text></Text>
+        <Text style={card.addressText}>{formatAddress(address)}</Text>
+
+        <View style={{ marginVertical: Spacing.sm }}><Divider /></View>
+        <View style={card.actions}>
+          <Pressable style={card.actionBtn} onPress={onEdit}>
+            <Ionicons name="pencil-outline" size={14} color={Colors.primary} />
+            <Text style={card.actionText}>Edit</Text>
+          </Pressable>
+          {!address.is_default && (
+            <Pressable style={card.actionBtn} onPress={onSetDefault}>
+              <Ionicons name="star-outline" size={14} color={Colors.primary} />
+              <Text style={card.actionText}>Set Default</Text>
+            </Pressable>
+          )}
+          <Pressable style={card.actionBtn} onPress={confirmDelete}>
+            <Ionicons name="trash-outline" size={14} color={Colors.danger} />
+            <Text style={[card.actionText, { color: Colors.danger }]}>Delete</Text>
+          </Pressable>
+        </View>
       </View>
-    </View>
+    </>
   );
 }
 
@@ -378,7 +435,7 @@ export default function Addresses() {
       <StatusBar style="dark" />
 
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/profile' as any)} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={Colors.textPrimary} />
         </Pressable>
         <Text style={styles.title}>Manage Addresses</Text>

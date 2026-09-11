@@ -1,16 +1,17 @@
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator, Linking } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { Image } from 'expo-image';
 import * as Location from 'expo-location';
+import { router, useLocalSearchParams } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import LeafletMap from '../components/ui/LeafletMap';
-import { api, marketApi, ApiProduct, ApiMarket } from '../lib/api';
-import { haversineKm, formatKm } from '../utils/distance';
 import { Colors } from '../constants/colors';
+import { Radius, Shadow, Spacing } from '../constants/spacing';
 import { FontFamily, FontSize } from '../constants/typography';
-import { Spacing, Radius, Shadow } from '../constants/spacing';
+import { ApiMarket, imgUrl, marketApi } from '../lib/api';
+import { formatKm, haversineKm } from '../utils/distance';
 
 function buildDetailMapHtml(m: ApiMarket): string {
   if (!m.lat || !m.lng) return '<html><body style="background:#f0f0f0"></body></html>';
@@ -34,8 +35,8 @@ html,body{width:100%;height:100%;overflow:hidden}
 <body>
 <div id="map"></div>
 <script>
-var map=L.map('map',{zoomControl:false,dragging:false,scrollWheelZoom:false}).setView([${m.lat},${m.lng}],15);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+var map=L.map('map',{zoomControl:true,dragging:true,scrollWheelZoom:false,doubleClickZoom:true}).setView([${m.lat},${m.lng}],15);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
 var pin=L.divIcon({className:'',html:'<div class="mpin"></div>',iconSize:[26,26],iconAnchor:[13,26],popupAnchor:[0,-30]});
 L.marker([${m.lat},${m.lng}],{icon:pin}).addTo(map)
   .bindTooltip('${m.name}',{permanent:true,direction:'top',offset:[0,-10]});
@@ -50,18 +51,21 @@ function isOpen(m: ApiMarket) {
   return h >= m.open_hour && h < m.close_hour;
 }
 
-const TABS = ["Today's Prices", 'About', 'Photos'];
-const PRODUCE_EMOJIS = ['🥦','🍅','🧅','🥕','🌽','🍆','🌿','🥒','🫑','🍌','🧄','🫛'];
+const TABS = [
+  { label: 'About',  icon: 'information-circle-outline' },
+  { label: 'Photos', icon: 'images-outline' },
+] as const;
 
 export default function MarketDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id }            = useLocalSearchParams<{ id: string }>();
+  const { width: SW, height: SH } = useWindowDimensions();
 
   const [market,        setMarket]        = useState<ApiMarket | null>(null);
   const [activeTab,     setActiveTab]     = useState(0);
-  const [products,      setProducts]      = useState<ApiProduct[]>([]);
   const [loadingMarket, setLoadingMarket] = useState(true);
-  const [loadingPrices, setLoadingPrices] = useState(false);
   const [userLocation,  setUserLocation]  = useState<{ lat: number; lng: number } | null>(null);
+  const [lightboxIdx,   setLightboxIdx]   = useState<number | null>(null);
+  const flatListRef = useRef<FlatList<string>>(null);
 
   // Get real GPS location
   useEffect(() => {
@@ -82,14 +86,6 @@ export default function MarketDetail() {
       .finally(() => setLoadingMarket(false));
   }, [id]);
 
-  useEffect(() => {
-    if (activeTab !== 0) return;
-    setLoadingPrices(true);
-    api.get<ApiProduct[]>('/api/products?limit=20')
-      .then(setProducts)
-      .catch(() => {})
-      .finally(() => setLoadingPrices(false));
-  }, [activeTab]);
 
   if (loadingMarket || !market) {
     return (
@@ -109,7 +105,10 @@ export default function MarketDetail() {
 
       {/* Hero */}
       <View style={styles.hero}>
-        <Text style={styles.heroEmoji}>🏪</Text>
+        {market.images?.[0]
+          ? <Image source={{ uri: imgUrl(market.images[0])! }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          : <Text style={styles.heroEmoji}>🏪</Text>
+        }
         <Pressable style={[styles.iconBtn, { left: Spacing.lg }]} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={20} color={Colors.textPrimary} />
         </Pressable>
@@ -119,6 +118,79 @@ export default function MarketDetail() {
           </Text>
         </View>
       </View>
+
+      {/* Fullscreen image lightbox */}
+      <Modal
+        visible={lightboxIdx !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLightboxIdx(null)}
+        statusBarTranslucent
+      >
+        <View style={lb.overlay}>
+          <FlatList
+            ref={flatListRef}
+            data={market.images ?? []}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            initialScrollIndex={lightboxIdx ?? 0}
+            getItemLayout={(_, index) => ({ length: SW, offset: SW * index, index })}
+            keyExtractor={(_, i) => String(i)}
+            renderItem={({ item }) => (
+              <View style={{ width: SW, height: SH, alignItems: 'center', justifyContent: 'center' }}>
+                <Image
+                  source={{ uri: imgUrl(item)! }}
+                  style={{ width: SW, height: SH * 0.75 }}
+                  contentFit="contain"
+                />
+              </View>
+            )}
+            onMomentumScrollEnd={e => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / SW);
+              setLightboxIdx(idx);
+            }}
+          />
+
+          {/* Left arrow */}
+          {(lightboxIdx ?? 0) > 0 && (
+            <Pressable
+              style={[lb.arrow, lb.arrowLeft]}
+              onPress={() => {
+                const next = (lightboxIdx ?? 0) - 1;
+                flatListRef.current?.scrollToIndex({ index: next, animated: true });
+                setLightboxIdx(next);
+              }}
+            >
+              <Ionicons name="chevron-back" size={26} color="#fff" />
+            </Pressable>
+          )}
+
+          {/* Right arrow */}
+          {(lightboxIdx ?? 0) < (market.images?.length ?? 0) - 1 && (
+            <Pressable
+              style={[lb.arrow, lb.arrowRight]}
+              onPress={() => {
+                const next = (lightboxIdx ?? 0) + 1;
+                flatListRef.current?.scrollToIndex({ index: next, animated: true });
+                setLightboxIdx(next);
+              }}
+            >
+              <Ionicons name="chevron-forward" size={26} color="#fff" />
+            </Pressable>
+          )}
+
+          {/* Close */}
+          <Pressable style={lb.close} onPress={() => setLightboxIdx(null)}>
+            <Ionicons name="close" size={22} color="#fff" />
+          </Pressable>
+
+          {/* Counter */}
+          <Text style={lb.counter}>
+            {(lightboxIdx ?? 0) + 1} / {market.images?.length ?? 0}
+          </Text>
+        </View>
+      </Modal>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={styles.nameSection}>
@@ -169,51 +241,22 @@ export default function MarketDetail() {
         {/* Tabs */}
         <View style={styles.tabRow}>
           {TABS.map((t, i) => (
-            <Pressable key={t} style={[styles.tab, activeTab === i && styles.tabActive]} onPress={() => setActiveTab(i)}>
-              <Text style={[styles.tabLabel, activeTab === i && styles.tabLabelActive]}>{t}</Text>
+            <Pressable key={t.label} style={styles.tab} onPress={() => setActiveTab(i)}>
+              <Ionicons
+                name={t.icon as any}
+                size={18}
+                color={activeTab === i ? Colors.primary : Colors.textMuted}
+              />
+              <Text style={[styles.tabLabel, activeTab === i && styles.tabLabelActive]}>
+                {t.label}
+              </Text>
+              {activeTab === i && <View style={styles.tabIndicator} />}
             </Pressable>
           ))}
         </View>
 
+        {/* About */}
         {activeTab === 0 && (
-          loadingPrices ? (
-            <View style={{ paddingVertical: Spacing.xxxl, alignItems: 'center' }}>
-              <ActivityIndicator color={Colors.primary} />
-            </View>
-          ) : (
-            <View style={styles.priceCard}>
-              <View style={styles.priceHeader}>
-                <Text style={[styles.priceCol, { flex: 2 }]}>Item</Text>
-                <Text style={styles.priceCol}>Price</Text>
-                <Text style={styles.priceCol}>Unit</Text>
-                <Text style={styles.priceCol}>Chg</Text>
-              </View>
-              {products.filter(p => p.is_active).map(p => {
-                const drop = p.previous_price > p.price;
-                const rise = p.previous_price < p.price;
-                return (
-                  <View key={p.id} style={styles.priceRow}>
-                    <View style={[styles.itemCell, { flex: 2 }]}>
-                      <Text style={styles.itemEmoji}>{p.emoji ?? '🥦'}</Text>
-                      <Text style={styles.itemName} numberOfLines={1}>{p.name}</Text>
-                    </View>
-                    <Text style={styles.today}>₹{p.price}</Text>
-                    <Text style={styles.unitText}>{p.unit}</Text>
-                    <View style={{ flex: 1, alignItems: 'center' }}>
-                      <View style={[styles.chgBadge, drop ? styles.chgDown : rise ? styles.chgUp : styles.chgFlat]}>
-                        <Text style={[styles.chgText, drop ? styles.chgDownText : rise ? styles.chgUpText : styles.chgFlatText]}>
-                          {drop ? `↓${p.previous_price - p.price}` : rise ? `↑${p.price - p.previous_price}` : '–'}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          )
-        )}
-
-        {activeTab === 1 && (
           <View style={styles.aboutCard}>
             <View style={styles.aboutRow}><Text style={styles.aboutKey}>Hours</Text><Text style={styles.aboutVal}>{market.opens} – {market.closes}</Text></View>
             <View style={styles.sep} />
@@ -241,13 +284,17 @@ export default function MarketDetail() {
           </View>
         )}
 
-        {activeTab === 2 && (
+        {/* Photos */}
+        {activeTab === 1 && (
           <View style={styles.photosGrid}>
-            {PRODUCE_EMOJIS.map((emoji, i) => (
-              <View key={i} style={styles.photoCell}>
-                <Text style={styles.photoEmoji}>{emoji}</Text>
-              </View>
-            ))}
+            {(market.images ?? []).length > 0
+              ? (market.images!).map((img, i) => (
+                  <Pressable key={i} style={styles.photoCell} onPress={() => setLightboxIdx(i)}>
+                    <Image source={{ uri: imgUrl(img)! }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                  </Pressable>
+                ))
+              : <Text style={{ padding: Spacing.xxl, color: Colors.textMuted, fontFamily: FontFamily.regular }}>No photos yet.</Text>
+            }
           </View>
         )}
       </ScrollView>
@@ -274,29 +321,11 @@ const styles = StyleSheet.create({
   statItem: { alignItems: 'center', gap: 4 },
   statVal: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
 
-  tabRow: { flexDirection: 'row', marginHorizontal: Spacing.xxl, backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: 4, ...Shadow.sm, marginBottom: Spacing.lg },
-  tab: { flex: 1, paddingVertical: Spacing.sm, alignItems: 'center', borderRadius: Radius.md },
-  tabActive: { backgroundColor: Colors.primaryDark },
-  tabLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.textMuted },
-  tabLabelActive: { color: Colors.textInverse, fontFamily: FontFamily.semiBold },
-
-  priceCard: { marginHorizontal: Spacing.xxl, backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm },
-  priceHeader: { flexDirection: 'row', backgroundColor: Colors.primaryPale, padding: Spacing.md },
-  priceCol: { flex: 1, fontFamily: FontFamily.semiBold, fontSize: FontSize.xs, color: Colors.primary, textAlign: 'center' },
-  priceRow: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border },
-  itemCell: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  itemEmoji: { fontSize: 18 },
-  itemName: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textPrimary },
-  today: { flex: 1, fontFamily: FontFamily.bold, fontSize: FontSize.sm, color: Colors.textPrimary, textAlign: 'center' },
-  unitText: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, textAlign: 'center' },
-  chgBadge: { borderRadius: Radius.full, paddingHorizontal: 6, paddingVertical: 2 },
-  chgDown: { backgroundColor: Colors.successLight },
-  chgUp: { backgroundColor: Colors.dangerLight },
-  chgFlat: { backgroundColor: Colors.background },
-  chgText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs },
-  chgDownText: { color: Colors.success },
-  chgUpText: { color: Colors.danger },
-  chgFlatText: { color: Colors.textMuted },
+  tabRow: { flexDirection: 'row', marginHorizontal: Spacing.xxl, marginBottom: Spacing.lg, borderBottomWidth: 2, borderBottomColor: Colors.border },
+  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, paddingVertical: Spacing.md, position: 'relative' },
+  tabIndicator: { position: 'absolute', bottom: -2, left: 0, right: 0, height: 2, backgroundColor: Colors.primary, borderRadius: 1 },
+  tabLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textMuted },
+  tabLabelActive: { color: Colors.primary, fontFamily: FontFamily.bold },
 
   aboutCard: { marginHorizontal: Spacing.xxl, backgroundColor: Colors.surface, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm },
   aboutRow: { flexDirection: 'row', justifyContent: 'space-between', padding: Spacing.md },
@@ -307,9 +336,8 @@ const styles = StyleSheet.create({
   facilityChip: { backgroundColor: Colors.primaryLight, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
   facilityText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.primary },
 
-  photosGrid: { marginHorizontal: Spacing.xxl, flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  photoCell: { width: '31.5%', aspectRatio: 1, backgroundColor: Colors.primaryPale, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
-  photoEmoji: { fontSize: 40 },
+  photosGrid: { marginHorizontal: Spacing.xxl, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  photoCell: { width: '48.5%', aspectRatio: 1, backgroundColor: Colors.primaryPale, borderRadius: Radius.md, overflow: 'hidden' },
 
   mapCard: { marginHorizontal: Spacing.xxl, marginBottom: Spacing.lg, borderRadius: Radius.lg, overflow: 'hidden', ...Shadow.sm, height: 230, backgroundColor: Colors.surface },
   mapView: { flex: 1 },
@@ -319,4 +347,13 @@ const styles = StyleSheet.create({
   mapAddr: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 1 },
   directionsBtn: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, backgroundColor: Colors.primaryDark, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
   directionsTxt: { fontFamily: FontFamily.semiBold, fontSize: FontSize.xs, color: Colors.textInverse },
+});
+
+const lb = StyleSheet.create({
+  overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)' },
+  close:      { position: 'absolute', top: 52, right: Spacing.lg, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
+  counter:    { position: 'absolute', bottom: 44, alignSelf: 'center', fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.8)' },
+  arrow:      { position: 'absolute', top: '42%', width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  arrowLeft:  { left: Spacing.lg },
+  arrowRight: { right: Spacing.lg },
 });

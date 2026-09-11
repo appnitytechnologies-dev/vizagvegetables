@@ -12,6 +12,7 @@ import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
 import Divider from '../components/ui/Divider';
+import PageHeader from '../components/ui/PageHeader';
 import { api } from '../lib/api';
 
 const FAQS = [
@@ -26,7 +27,7 @@ const FAQS = [
 const CONTACTS = [
   { icon: 'call-outline',       label: 'Call Us',    sub: '+91 89195 00000',             action: () => Linking.openURL('tel:+918919500000') },
   { icon: 'chatbubble-outline', label: 'WhatsApp',   sub: 'Chat with support',           action: () => Linking.openURL('https://wa.me/918919500000') },
-  { icon: 'mail-outline',       label: 'Email Us',   sub: 'support@vizagvegetables.in',  action: () => Linking.openURL('mailto:support@vizagvegetables.in') },
+  { icon: 'mail-outline',       label: 'Email Us',   sub: 'support@yzagfresh.in',  action: () => Linking.openURL('mailto:support@yzagfresh.in') },
 ];
 
 function FAQItem({ q, a }: { q: string; a: string }) {
@@ -101,14 +102,7 @@ export default function Support() {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
 
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={22} color={Colors.textPrimary} />
-        </Pressable>
-        <Text style={styles.title}>Support</Text>
-        <View style={{ width: 36 }} />
-      </View>
-      <Divider />
+      <PageHeader title="Support" fallback="/(tabs)/profile" />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

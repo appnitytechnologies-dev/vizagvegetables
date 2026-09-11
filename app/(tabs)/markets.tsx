@@ -6,10 +6,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import * as Location from 'expo-location';
 import LeafletMap from '../../components/ui/LeafletMap';
-import { marketApi, ApiMarket } from '../../lib/api';
+import { marketApi, ApiMarket, imgUrl } from '../../lib/api';
+import { Image } from 'expo-image';
 import { haversineKm, formatKm } from '../../utils/distance';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
@@ -70,7 +72,7 @@ html,body{width:100%;height:100%;overflow:hidden}
 <div id="map"></div>
 <script>
 var map=L.map('map',{zoomControl:false,dragging:true}).setView([17.7100,83.2900],12);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19}).addTo(map);
 var pin=L.divIcon({className:'',html:'<div class="mpin"></div>',iconSize:[22,22],iconAnchor:[11,22],popupAnchor:[0,-26]});
     ${markerJs}
 </script>
@@ -97,7 +99,8 @@ const badge = StyleSheet.create({
 });
 
 function FeaturedCard({ m, userLocation }: { m: ApiMarket; userLocation: UserLocation }) {
-  const open = isOpenNow(m.open_hour, m.close_hour);
+  const open     = isOpenNow(m.open_hour, m.close_hour);
+  const firstImg = m.images?.[0] ? imgUrl(m.images[0]) : null;
   const dist = userLocation && m.lat && m.lng
     ? formatKm(haversineKm(userLocation.lat, userLocation.lng, m.lat, m.lng))
     : m.distance_km ? `${m.distance_km} km` : null;
@@ -107,7 +110,10 @@ function FeaturedCard({ m, userLocation }: { m: ApiMarket; userLocation: UserLoc
       onPress={() => router.push({ pathname: '/market-detail', params: { id: m.id } } as any)}
     >
       <View style={[featCard.img, { backgroundColor: m.bg_color }]}>
-        <Text style={featCard.emoji}>🏪</Text>
+        {firstImg
+          ? <Image source={{ uri: firstImg }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          : <Text style={featCard.emoji}>🏪</Text>
+        }
         <View style={featCard.badge}><OpenBadge open={open} /></View>
       </View>
       <View style={featCard.info}>
@@ -141,7 +147,8 @@ const featCard = StyleSheet.create({
 });
 
 function ListCard({ m, userLocation }: { m: ApiMarket; userLocation: UserLocation }) {
-  const open = isOpenNow(m.open_hour, m.close_hour);
+  const open     = isOpenNow(m.open_hour, m.close_hour);
+  const firstImg = m.images?.[0] ? imgUrl(m.images[0]) : null;
   const dist = userLocation && m.lat && m.lng
     ? formatKm(haversineKm(userLocation.lat, userLocation.lng, m.lat, m.lng))
     : m.distance_km ? `${m.distance_km} km` : null;
@@ -151,7 +158,10 @@ function ListCard({ m, userLocation }: { m: ApiMarket; userLocation: UserLocatio
       onPress={() => router.push({ pathname: '/market-detail', params: { id: m.id } } as any)}
     >
       <View style={[listCard.img, { backgroundColor: m.bg_color }]}>
-        <Text style={listCard.emoji}>🏪</Text>
+        {firstImg
+          ? <Image source={{ uri: firstImg }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          : <Text style={listCard.emoji}>🏪</Text>
+        }
       </View>
       <View style={listCard.info}>
         <Text style={listCard.name}>{m.name}</Text>
@@ -239,27 +249,31 @@ export default function MarketsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Markets</Text>
-          <View style={styles.locationRow}>
-            <Ionicons name="location-sharp" size={13} color={Colors.primaryDark} />
-            <Text style={styles.locationText}>visakhapatnam</Text>
+      {/* Green gradient header */}
+      <LinearGradient
+        colors={['#1B5E35', '#2E7D32']}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.title}>Markets</Text>
+            <View style={styles.locationRow}>
+              <Ionicons name="location-sharp" size={13} color="rgba(255,255,255,0.8)" />
+              <Text style={styles.locationText}>Visakhapatnam</Text>
+            </View>
           </View>
+          <Pressable style={styles.bellBtn} onPress={() => router.push('/notifications' as any)}>
+            <Ionicons name="notifications-outline" size={22} color={Colors.primary} />
+            <View style={styles.bellDot} />
+          </Pressable>
         </View>
-        <Pressable style={styles.bellBtn} onPress={() => router.push('/notifications' as any)}>
-          <Ionicons name="notifications-outline" size={22} color={Colors.textPrimary} />
-          <View style={styles.bellDot} />
-        </Pressable>
-      </View>
 
-      {/* Search */}
-      <View style={styles.searchWrap}>
+        {/* Search bar */}
         <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={18} color={Colors.textMuted} />
+          <Ionicons name="search-outline" size={16} color={Colors.textMuted} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search markets"
@@ -268,7 +282,7 @@ export default function MarketsScreen() {
             onChangeText={setQuery}
           />
         </View>
-      </View>
+      </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Real map with Rythu Bazar pins */}
@@ -358,17 +372,17 @@ export default function MarketsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
+  container: { flex: 1, backgroundColor: '#F2F3F5' },
 
-  header:       { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, backgroundColor: Colors.surface },
-  title:        { fontFamily: FontFamily.bold, fontSize: FontSize.xxxl, color: Colors.textPrimary, letterSpacing: -0.5 },
+  header:       { paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.lg, gap: Spacing.sm, borderBottomLeftRadius: Radius.xl, borderBottomRightRadius: Radius.xl, overflow: 'hidden' },
+  headerTop:    { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  title:        { fontFamily: FontFamily.bold, fontSize: FontSize.xxl, color: '#fff', letterSpacing: -0.5 },
   locationRow:  { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
-  locationText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primaryDark },
-  bellBtn:      { width: 44, height: 44, borderRadius: Radius.full, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', ...Shadow.sm, position: 'relative' },
+  locationText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.85)' },
+  bellBtn:      { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', position: 'relative' },
   bellDot:      { position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.danger },
 
-  searchWrap:  { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, backgroundColor: Colors.surface },
-  searchBar:   { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.background, borderRadius: Radius.full, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, gap: Spacing.sm },
+  searchBar:   { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: Spacing.sm },
   searchInput: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textPrimary, padding: 0, outlineStyle: 'none' } as any,
 
   mapBox:       { margin: Spacing.lg, backgroundColor: Colors.surface, borderRadius: Radius.xl, overflow: 'hidden', ...Shadow.sm, height: 210 },

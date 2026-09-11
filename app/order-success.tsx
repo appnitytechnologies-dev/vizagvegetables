@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   summaryCard: { width: '100%', backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, gap: Spacing.md, ...Shadow.md, borderWidth: 1, borderColor: Colors.border },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
   summaryKey: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary },
-  summaryVal: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
+  summaryVal: { fontFamily: FontFamily.numMed, fontSize: FontSize.sm, color: Colors.textPrimary },
   sep: { height: 1, backgroundColor: Colors.border },
   btnCol: { width: '100%', gap: Spacing.md },
   trackBtn: { backgroundColor: Colors.primary, borderRadius: Radius.full, paddingVertical: Spacing.lg, alignItems: 'center' },
