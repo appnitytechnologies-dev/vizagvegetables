@@ -32,6 +32,15 @@ jobs:
     environment: production
 
     steps:
+      # workflow_dispatch lets the caller pick any branch. Production releases
+      # ship from main only; develop is the integration/test branch.
+      - name: Enforce release from main
+        run: |
+          if [ "${{ github.ref_name }}" != "main" ]; then
+            echo "::error::Releases must be dispatched from main (got '${{ github.ref_name }}'). Merge develop into main first."
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
