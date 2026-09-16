@@ -29,8 +29,10 @@ jobs:
 
       # Fail fast with a readable message instead of a confusing eas-cli auth error.
       - name: Verify EXPO_TOKEN is configured
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+          if [ -z "$EXPO_TOKEN" ]; then
             echo "::error::EXPO_TOKEN secret is not set. Create a personal access token at https://expo.dev/settings/access-tokens and add it under Settings > Secrets and variables > Actions."
             exit 1
           fi
@@ -86,9 +88,20 @@ jobs:
       # the build actually succeeded. With --no-wait the job goes green as soon
       # as the build is queued, so a failed build shows up as a passing check.
       - name: EAS Preview Build
+        env:
+          # Passed as an environment variable, never interpolated into the script.
+          # A commit message is arbitrary multi-line text: the message for 56fcb40
+          # contained a double quote, which closed the --message string early and
+          # left stray words as arguments ("Unexpected arguments: for, build, to").
+          # Interpolating repository-controlled text into a run block is also the
+          # classic Actions script-injection vector.
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
+          # EAS wants a one-line label; take the subject and cap its length.
+          MSG=$(printf '%s' "${COMMIT_MESSAGE:-$REF_NAME}" | head -n 1 | cut -c1-180)
           eas build \
             --platform android \
             --profile preview \
             --non-interactive \
-            --message "${{ github.event.head_commit.message || github.ref_name }}"
+            --message "$MSG"
