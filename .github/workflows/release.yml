@@ -1,0 +1,122 @@
+name: Android Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      submit:
+        description: 'Submit the build to Google Play after it succeeds'
+        type: boolean
+        default: true
+      tag:
+        description: 'Tag the commit and create a GitHub Release'
+        type: boolean
+        default: true
+
+# contents: write is needed to push the release tag and create the GitHub Release.
+permissions:
+  contents: write
+
+# Never cancel a release that is already building or submitting.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build & Submit to Google Play
+    runs-on: ubuntu-latest
+
+    # Gate the job behind a GitHub Environment so a release requires approval
+    # rather than being one click away for anyone with write access.
+    # Configure reviewers under Settings > Environments > production.
+    environment: production
+
+    steps:
+      # workflow_dispatch lets the caller pick any branch. Production releases
+      # ship from main only; develop is the integration/test branch.
+      - name: Enforce release from main
+        run: |
+          if [ "${{ github.ref_name }}" != "main" ]; then
+            echo "::error::Releases must be dispatched from main (got '${{ github.ref_name }}'). Merge develop into main first."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify EXPO_TOKEN is configured
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "::error::EXPO_TOKEN secret is not set. Create a personal access token at https://expo.dev/settings/access-tokens and add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - name: Read app version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Releasing version $VERSION"
+
+      # Checked before the build so a duplicate version fails in seconds
+      # rather than after EAS has spent 30+ minutes building.
+      - name: Ensure release tag is unused
+        if: ${{ inputs.tag }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG already exists. Bump \"version\" in app.json before releasing."
+            exit 1
+          fi
+          echo "Tag $TAG is available."
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Expo Doctor
+        run: npx expo-doctor
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: TypeScript check
+        run: npm run typecheck
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+          packager: npm
+
+      # No --no-wait here: the run must stay alive to report whether the build
+      # and the Play submission actually succeeded before anything is tagged.
+      - name: EAS Production Build
+        env:
+          AUTO_SUBMIT: ${{ inputs.submit && '--auto-submit' || '' }}
+        run: |
+          eas build \
+            --platform android \
+            --profile production \
+            --non-interactive \
+            --message "Release ${{ steps.version.outputs.tag }} (${{ github.sha }})" \
+            $AUTO_SUBMIT
+
+      - name: Tag release
+        if: ${{ inputs.tag }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          git tag "$TAG" "${{ github.sha }}"
+          git push origin "$TAG"
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --generate-notes

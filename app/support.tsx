@@ -150,7 +150,7 @@ export default function Support() {
               <View style={styles.sentWrap}>
                 <Text style={styles.sentEmoji}>✅</Text>
                 <Text style={styles.sentTitle}>Message sent!</Text>
-                <Text style={styles.sentSub}>We'll get back to you within 24 hours.</Text>
+                <Text style={styles.sentSub}>We’ll get back to you within 24 hours.</Text>
                 <Pressable onPress={() => setSent(false)} style={styles.sendAnotherBtn}>
                   <Text style={styles.sendAnotherText}>Send Another</Text>
                 </Pressable>

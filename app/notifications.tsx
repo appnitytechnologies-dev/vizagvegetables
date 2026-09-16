@@ -148,7 +148,7 @@ export default function NotificationsScreen() {
       ) : notifs.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyEmoji}>🔔</Text>
-          <Text style={styles.emptyTitle}>You're all caught up!</Text>
+          <Text style={styles.emptyTitle}>You’re all caught up!</Text>
           <Text style={styles.emptyBody}>No notifications right now.</Text>
         </View>
       ) : (

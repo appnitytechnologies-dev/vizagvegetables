@@ -239,7 +239,7 @@ export default function PriceScreen() {
       >
         <View style={styles.titleRow}>
           <View>
-            <Text style={styles.title}>Today's Prices</Text>
+            <Text style={styles.title}>Today’s Prices</Text>
             <Text style={styles.telugu}>రైతు బజార్ కూరగాయల ధరలు</Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>

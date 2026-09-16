@@ -208,7 +208,7 @@ export default function OtpVerify() {
           </View>
 
           <View style={styles.resendRow}>
-            <Text style={styles.resendLabel}>Didn't receive OTP</Text>
+            <Text style={styles.resendLabel}>Didn’t receive OTP</Text>
             {timer > 0 ? (
               <Text style={styles.resendTimer}>Resend in {timer}s</Text>
             ) : (
