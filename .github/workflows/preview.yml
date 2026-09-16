@@ -19,6 +19,9 @@ jobs:
   preview:
     name: Preview Build (Android)
     runs-on: ubuntu-latest
+    # The run now waits for EAS, so cap it well above a normal build (20-40 min)
+    # rather than letting a stuck build hold a runner for the 6 hour default.
+    timeout-minutes: 90
 
     steps:
       - name: Checkout repository
@@ -51,15 +54,41 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
           packager: npm
 
+      # Cancelling this workflow run does NOT stop a running EAS build: eas-cli
+      # has no signal handler for it ("press Ctrl+C to exit" leaves the build
+      # going), so concurrency.cancel-in-progress cannot reclaim EAS credits on
+      # its own. Superseded builds must be cancelled explicitly, by id, because
+      # `eas build:cancel` refuses to run without one in non-interactive mode.
+      - name: Cancel superseded preview builds
+        run: |
+          IDS=$(for STATUS in new in-queue in-progress; do
+            eas build:list \
+              --platform android \
+              --build-profile preview \
+              --status "$STATUS" \
+              --limit 50 \
+              --non-interactive \
+              --json 2>/dev/null \
+              | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{JSON.parse(s).forEach(b=>console.log(b.id))}catch(e){}})"
+          done | sort -u)
+          if [ -z "$IDS" ]; then
+            echo "No preview builds in flight."
+          else
+            for ID in $IDS; do
+              echo "Cancelling superseded build $ID"
+              eas build:cancel "$ID" --non-interactive || echo "  could not cancel $ID (likely finished already)"
+            done
+          fi
+
       # Android only: no Apple credentials are provisioned yet, so --platform all
       # would fail the iOS half of every run.
-      # --no-wait queues the build and exits, instead of billing Actions minutes
-      # for the 20-40 minutes EAS spends building.
+      # Deliberately NOT --no-wait: waiting is what makes this run report whether
+      # the build actually succeeded. With --no-wait the job goes green as soon
+      # as the build is queued, so a failed build shows up as a passing check.
       - name: EAS Preview Build
         run: |
           eas build \
             --platform android \
             --profile preview \
             --non-interactive \
-            --no-wait \
             --message "${{ github.event.head_commit.message || github.ref_name }}"
