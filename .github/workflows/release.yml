@@ -35,9 +35,11 @@ jobs:
       # workflow_dispatch lets the caller pick any branch. Production releases
       # ship from main only; develop is the integration/test branch.
       - name: Enforce release from main
+        env:
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ "${{ github.ref_name }}" != "main" ]; then
-            echo "::error::Releases must be dispatched from main (got '${{ github.ref_name }}'). Merge develop into main first."
+          if [ "$REF_NAME" != "main" ]; then
+            echo "::error::Releases must be dispatched from main (got '$REF_NAME'). Merge develop into main first."
             exit 1
           fi
 
@@ -45,8 +47,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Verify EXPO_TOKEN is configured
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+          if [ -z "$EXPO_TOKEN" ]; then
             echo "::error::EXPO_TOKEN secret is not set. Create a personal access token at https://expo.dev/settings/access-tokens and add it under Settings > Secrets and variables > Actions."
             exit 1
           fi
@@ -63,8 +67,9 @@ jobs:
       # rather than after EAS has spent 30+ minutes building.
       - name: Ensure release tag is unused
         if: ${{ inputs.tag }}
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          TAG="${{ steps.version.outputs.tag }}"
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
             echo "::error::Tag $TAG already exists. Bump \"version\" in app.json before releasing."
             exit 1
@@ -101,21 +106,24 @@ jobs:
       - name: EAS Production Build
         env:
           AUTO_SUBMIT: ${{ inputs.submit && '--auto-submit' || '' }}
+          TAG: ${{ steps.version.outputs.tag }}
+          SHA: ${{ github.sha }}
         run: |
           eas build \
             --platform android \
             --profile production \
             --non-interactive \
-            --message "Release ${{ steps.version.outputs.tag }} (${{ github.sha }})" \
+            --message "Release $TAG ($SHA)" \
             $AUTO_SUBMIT
 
       - name: Tag release
         if: ${{ inputs.tag }}
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          SHA: ${{ github.sha }}
         run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          git tag "$TAG" "${{ github.sha }}"
+          git tag "$TAG" "$SHA"
           git push origin "$TAG"
           gh release create "$TAG" \
             --title "$TAG" \
