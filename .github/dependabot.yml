@@ -1,22 +1,22 @@
 version: 2
 updates:
-  # Stale Expo SDK patch versions are what broke `expo-doctor` in CI.
-  - package-ecosystem: npm
-    directory: /
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
-    groups:
-      expo:
-        patterns:
-          - 'expo'
-          - 'expo-*'
-          - '@expo/*'
-      react-navigation:
-        patterns:
-          - '@react-navigation/*'
-
+  # npm is deliberately NOT managed here.
+  #
+  # Expo pins the expected version of every SDK-aware package (expo, expo-*,
+  # react-native, react-native-*, @react-navigation/*, eslint-config-expo, ...)
+  # and `expo-doctor` fails CI on ANY deviation from those pins. Dependabot
+  # always bumps to npm-latest, so its npm PRs can never go green: the grouped
+  # PR proposed SDK 54 -> 57 in one shot, and even a patch-level
+  # @react-navigation/bottom-tabs bump (^7.4.0 -> ^7.18.18) failed doctor.
+  #
+  # Upgrade npm dependencies with `npx expo install --fix`, as a deliberate
+  # step when moving Expo SDK versions.
+  #
+  # This does not affect Dependabot *security* alerts, which are configured
+  # in repo settings, not in this file.
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    # Follow the same path as every other change: into develop, then main.
+    target-branch: develop
