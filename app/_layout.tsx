@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { Platform, View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Provider, useDispatch, useSelector } from 'react-redux';
@@ -38,6 +38,10 @@ Notifications.setNotificationHandler({
 });
 
 SplashScreen.preventAutoHideAsync();
+
+// Matches the in-app splash background so nothing flashes between the native
+// splash, redux-persist rehydration and the first rendered screen.
+const SPLASH_BACKGROUND = '#1B5E20';
 
 /** Rehydrates auth state and favourites from AsyncStorage on every app launch */
 function AuthLoader() {
@@ -164,7 +168,10 @@ export default function RootLayout() {
     Roboto_700Bold,
   });
 
-  useEffect(() => {
+  // Hiding on layout rather than in an effect: an effect fires after the render
+  // commit but before the first frame is painted, so the native splash was going
+  // away while the tree was still laying out -- that was the white flash.
+  const onLayoutRootView = useCallback(() => {
     if (fontsLoaded) {
       SplashScreen.hideAsync();
     }
@@ -173,8 +180,15 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
+    <View style={{ flex: 1, backgroundColor: SPLASH_BACKGROUND }} onLayout={onLayoutRootView}>
     <Provider store={store}>
-      <PersistGate persistor={persistor} loading={null}>
+      {/* loading={null} rendered nothing while redux-persist rehydrated, which
+          showed as a blank white screen after the native splash had already
+          been dismissed. Hold the splash colour instead. */}
+      <PersistGate
+        persistor={persistor}
+        loading={<View style={{ flex: 1, backgroundColor: SPLASH_BACKGROUND }} />}
+      >
         <>
           <AuthLoader />
           <CartSyncer />
@@ -202,5 +216,6 @@ export default function RootLayout() {
         </>
       </PersistGate>
     </Provider>
+    </View>
   );
 }

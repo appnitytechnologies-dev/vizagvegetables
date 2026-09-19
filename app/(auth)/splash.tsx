@@ -47,7 +47,7 @@ export default function SplashScreen() {
     } else if (auth.isLoggedIn && !auth.phone) {
       router.replace('/(auth)/complete-profile' as any);
     } else {
-      router.replace('/(auth)/get-started');
+      router.replace('/(auth)/otp-number');
     }
   }, [minTimeElapsed, auth.hydrated, auth.isLoggedIn, auth.phone]);
 
