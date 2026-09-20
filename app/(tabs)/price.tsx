@@ -191,7 +191,7 @@ export default function PriceScreen() {
         'Please log in to save favourites',
         [
           { text: 'Not now', style: 'cancel' },
-          { text: 'Login', onPress: () => router.push('/(auth)/otp-number' as any) },
+          { text: 'Login', onPress: () => router.push('/(auth)/get-started' as any) },
         ]
       );
       return;

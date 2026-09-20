@@ -120,7 +120,7 @@ export default function ProfileScreen() {
     await clearToken();
     dispatch(logoutAction());
     dispatch(clearFavourites());
-    router.replace('/(auth)/otp-number' as any);
+    router.replace('/(auth)/get-started' as any);
   };
 
   return (

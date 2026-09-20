@@ -40,7 +40,7 @@ function TabBar({ state, navigation }: any) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             if (tab.name === 'profile' && isGuest) {
               dispatch(setPendingAction({ type: 'VIEW_PROFILE', returnTo: '/(tabs)/profile' }));
-              router.push('/(auth)/otp-number');
+              router.push('/(auth)/get-started');
               return;
             }
             const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });

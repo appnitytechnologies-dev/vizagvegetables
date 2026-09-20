@@ -45,7 +45,7 @@ export default function CompleteProfile() {
     try { await GoogleSignin.signOut(); } catch {}
     await clearToken();
     dispatch(logout());
-    router.replace('/(auth)/otp-number');
+    router.replace('/(auth)/get-started');
   };
 
   const isValid = name.trim().length > 0 && phone.length === 10;

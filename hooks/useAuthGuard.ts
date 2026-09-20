@@ -11,7 +11,7 @@ export const useAuthGuard = () => {
   const guard = (action: NonNullable<PendingAction>, callback: () => void) => {
     if (isGuest) {
       dispatch(setPendingAction(action));
-      router.push('/(auth)/otp-number');
+      router.push('/(auth)/get-started');
       return;
     }
     callback();
