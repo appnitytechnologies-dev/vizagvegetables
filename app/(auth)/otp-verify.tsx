@@ -1,5 +1,5 @@
 // LEGACY: phone-OTP verification screen. Not currently reachable — login is
-// Google-only now (see otp-number.tsx). Kept for future re-enablement.
+// Google-only now (see get-started.tsx). Kept for future re-enablement.
 import { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -165,7 +165,7 @@ export default function OtpVerify() {
       <Pressable
         onPress={() => {
           if (router.canGoBack()) router.back();
-          else router.replace('/(auth)/otp-number');
+          else router.replace('/(auth)/get-started');
         }}
         style={styles.backBtn}
         hitSlop={12}
