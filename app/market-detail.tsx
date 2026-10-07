@@ -4,7 +4,7 @@ import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, FlatList, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import LeafletMap from '../components/ui/LeafletMap';
 import { Colors } from '../constants/colors';
@@ -52,8 +52,9 @@ function isOpen(m: ApiMarket) {
 }
 
 const TABS = [
-  { label: 'About',  icon: 'information-circle-outline' },
-  { label: 'Photos', icon: 'images-outline' },
+  { label: 'About',      icon: 'information-circle-outline' },
+  { label: 'Photos',     icon: 'images-outline' },
+  { label: 'Facilities', icon: 'grid-outline' },
 ] as const;
 
 export default function MarketDetail() {
@@ -112,10 +113,19 @@ export default function MarketDetail() {
         <Pressable style={[styles.iconBtn, { left: Spacing.lg }]} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={20} color={Colors.textPrimary} />
         </Pressable>
-        <View style={[styles.statusChip, open ? styles.openChip : styles.closedChip]}>
-          <Text style={[styles.statusText, open ? styles.openText : styles.closedText]}>
-            {open ? 'OPEN' : 'CLOSED'}
-          </Text>
+        <View style={styles.heroActions}>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => Share.share({ message: `${market.name} — ${market.address}\n\nhttps://maps.google.com/?q=${market.lat},${market.lng}` })}
+          >
+            <Ionicons name="share-social-outline" size={18} color={Colors.textPrimary} />
+          </Pressable>
+          <Pressable
+            style={styles.iconBtn}
+            onPress={() => Linking.openURL(`https://maps.google.com/?q=${market.lat},${market.lng}`)}
+          >
+            <Ionicons name="navigate-outline" size={18} color={Colors.textPrimary} />
+          </Pressable>
         </View>
       </View>
 
@@ -194,8 +204,15 @@ export default function MarketDetail() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={styles.nameSection}>
-          <Text style={styles.marketName}>{market.name}</Text>
-          <Text style={styles.marketArea}>{market.area}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.marketName}>{market.name}</Text>
+            <View style={[styles.statusChip, open ? styles.openChip : styles.closedChip]}>
+              <Text style={[styles.statusText, open ? styles.openText : styles.closedText]}>
+                {open ? 'Open' : 'Closed'}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.marketArea}>{market.area}, Visakhapatnam</Text>
         </View>
 
         {/* Stats strip */}
@@ -206,13 +223,16 @@ export default function MarketDetail() {
               val: userLocation && market.lat && market.lng
                 ? formatKm(haversineKm(userLocation.lat, userLocation.lng, market.lat, market.lng))
                 : market.distance_km ? `${market.distance_km} km` : '—',
+              label: 'Distance',
             },
-            { icon: 'time-outline',   val: market.opens ?? '—' },
-            { icon: 'people-outline', val: `${market.vendors_count} vendors` },
+            { icon: 'time-outline',   val: market.opens ?? '—',              label: 'Timings' },
+            { icon: 'people-outline', val: String(market.vendors_count),     label: 'Vendors' },
+            { icon: 'calendar-outline', val: market.days ?? '—',             label: 'Working Days' },
           ].map(s => (
-            <View key={s.icon} style={styles.statItem}>
-              <Ionicons name={s.icon as any} size={16} color={Colors.primary} />
-              <Text style={styles.statVal}>{s.val}</Text>
+            <View key={s.label} style={styles.statCard}>
+              <Ionicons name={s.icon as any} size={17} color={Colors.primary} />
+              <Text style={styles.statVal} numberOfLines={1}>{s.val}</Text>
+              <Text style={styles.statLabel}>{s.label}</Text>
             </View>
           ))}
         </View>
@@ -272,15 +292,6 @@ export default function MarketDetail() {
                   : market.distance_km ? `${market.distance_km} km from city centre` : '—'}
               </Text>
             </View>
-            <View style={styles.sep} />
-            <Text style={[styles.aboutKey, { padding: Spacing.md }]}>Facilities</Text>
-            <View style={styles.chipsRow}>
-              {(market.facilities ?? []).map(f => (
-                <View key={f} style={styles.facilityChip}>
-                  <Text style={styles.facilityText}>{f}</Text>
-                </View>
-              ))}
-            </View>
           </View>
         )}
 
@@ -297,6 +308,22 @@ export default function MarketDetail() {
             }
           </View>
         )}
+
+        {/* Facilities */}
+        {activeTab === 2 && (
+          <View style={styles.aboutCard}>
+            <View style={styles.chipsRow}>
+              {(market.facilities ?? []).length > 0
+                ? market.facilities!.map(f => (
+                    <View key={f} style={styles.facilityChip}>
+                      <Text style={styles.facilityText}>{f}</Text>
+                    </View>
+                  ))
+                : <Text style={{ padding: Spacing.md, color: Colors.textMuted, fontFamily: FontFamily.regular }}>No facilities listed.</Text>
+              }
+            </View>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -307,7 +334,8 @@ const styles = StyleSheet.create({
   hero: { height: 200, backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   heroEmoji: { fontSize: 80 },
   iconBtn: { position: 'absolute', top: Spacing.lg, width: 40, height: 40, borderRadius: Radius.sm, backgroundColor: Colors.surface, alignItems: 'center', justifyContent: 'center', ...Shadow.sm },
-  statusChip: { position: 'absolute', top: Spacing.lg, right: Spacing.lg, borderRadius: Radius.full, paddingHorizontal: Spacing.sm, paddingVertical: 4 },
+  heroActions: { position: 'absolute', top: Spacing.lg, right: Spacing.lg, flexDirection: 'row', gap: Spacing.sm },
+  statusChip: { borderRadius: Radius.full, paddingHorizontal: Spacing.sm, paddingVertical: 4 },
   openChip: { backgroundColor: Colors.successLight },
   closedChip: { backgroundColor: Colors.dangerLight },
   statusText: { fontFamily: FontFamily.bold, fontSize: FontSize.xs },
@@ -315,11 +343,13 @@ const styles = StyleSheet.create({
   closedText: { color: Colors.danger },
 
   nameSection: { padding: Spacing.xxl, paddingBottom: 0 },
-  marketName: { fontFamily: FontFamily.bold, fontSize: FontSize.xxl, color: Colors.textPrimary, letterSpacing: -0.3 },
-  marketArea: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary },
-  statsStrip: { flexDirection: 'row', justifyContent: 'space-around', padding: Spacing.lg, backgroundColor: Colors.surface, margin: Spacing.xxl, borderRadius: Radius.lg, ...Shadow.sm },
-  statItem: { alignItems: 'center', gap: 4 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  marketName: { flexShrink: 1, fontFamily: FontFamily.bold, fontSize: FontSize.xxl, color: Colors.textPrimary, letterSpacing: -0.3 },
+  marketArea: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 2 },
+  statsStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, padding: Spacing.lg, margin: Spacing.xxl, marginBottom: Spacing.lg },
+  statCard: { width: '47%', alignItems: 'center', gap: 4, paddingVertical: Spacing.md, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.surface },
   statVal: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
+  statLabel: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted },
 
   tabRow: { flexDirection: 'row', marginHorizontal: Spacing.xxl, marginBottom: Spacing.lg, borderBottomWidth: 2, borderBottomColor: Colors.border },
   tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, paddingVertical: Spacing.md, position: 'relative' },
