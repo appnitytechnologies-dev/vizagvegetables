@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Pressable,
-  ScrollView, TextInput, Modal, KeyboardAvoidingView, Platform,
+  ScrollView, TextInput, Modal, KeyboardAvoidingView, Platform, Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import BANNER_IMG from '../../assets/icons/banner-home.png';
 import { router } from 'expo-router';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius, Shadow } from '../../constants/spacing';
+import { TINTS } from '../../constants/tints';
 import { Image } from 'expo-image';
 import { api, ApiProduct, imgUrl } from '../../lib/api';
 import { useFavourites } from '../../hooks/useFavourites';
@@ -29,8 +30,16 @@ function apiToShop(p: ApiProduct): ShopProduct {
   return { id: p.id, name: p.name, te: p.telugu_name || '', emoji: p.emoji || '🥦', price: Math.round(p.price), orig: Math.round(p.previous_price), unit: p.unit, image_url: imgUrl(p.image_url), discount };
 }
 
-/** Rotating pastel backgrounds for produce tiles, as in the design. */
-const TINTS = ['#FDEBEC', '#E6F6F3', '#FDF3DC', '#EAF3FC', '#F1ECFB', '#E9F7EA'];
+interface ChickenRate { id: string; emoji: string; image_url: string | null; name: string; price: number; unit: string; }
+const CHICKEN_TINTS = ['#FDEBEC', '#E6F6F3', '#EAF3FC', '#FDF3DC'];
+// Placeholder until the backend exposes a chicken-rates endpoint (there is no
+// /api/... source for these yet — replace with a fetched list once one exists).
+const CHICKEN_RATES: ChickenRate[] = [
+  { id: 'broiler',  emoji: '🐔', image_url: null, name: 'Broiler',          price: 145,  unit: 'kg' },
+  { id: 'dressed',  emoji: '🍗', image_url: null, name: 'Dressed Chicken',  price: 260,  unit: 'kg' },
+  { id: 'skinless', emoji: '🍖', image_url: null, name: 'Skinless Chicken', price: 270,  unit: 'kg' },
+  { id: 'egg',      emoji: '🥚', image_url: null, name: 'Egg',              price: 5.45, unit: 'each' },
+];
 
 type Lang = 'en' | 'te';
 
@@ -116,6 +125,14 @@ export default function HomeScreen() {
 
   const now = new Date();
   const dateLine = `${now.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} | ${now.toLocaleDateString('en-IN', { weekday: 'long' })}`;
+  const lastUpdateLine = `${dateLine} • Last update: ${now.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}`;
+
+  const shareChickenRates = async () => {
+    const lines = CHICKEN_RATES.map(c => `${c.name}: ₹${c.price}/${c.unit}`).join('\n');
+    try {
+      await Share.share({ message: `🐔 Vizag Chicken Rates — ${dateLine}\n\n${lines}\n\nYZAG Fresh` });
+    } catch { /* user cancelled or share sheet unavailable */ }
+  };
 
   useEffect(() => {
     // Market rates come from the market_rates table (daily Rythu Bazar wholesale prices)
@@ -205,7 +222,7 @@ export default function HomeScreen() {
         <View style={styles.rateHead}>
           <View style={{ flex: 1 }}>
             <Text style={sh.title}>Today&apos;s Vizag Rythu Bazar Rates</Text>
-            <Text style={styles.dateLine}>{dateLine}</Text>
+            <Text style={styles.dateLine}>{lastUpdateLine}</Text>
           </View>
           <Pressable onPress={() => router.push('/(tabs)/price' as any)} hitSlop={8}>
             <Text style={sh.action}>View All ›</Text>
@@ -246,6 +263,30 @@ export default function HomeScreen() {
             ))}
           </ScrollView>
         )}
+
+        {/* ── Vizag Chicken Rates ── */}
+        <View style={{ height: Spacing.xl }} />
+        <View style={styles.rateHead}>
+          <View style={{ flex: 1 }}>
+            <View style={sh.left}>
+              <MaterialCommunityIcons name="food-drumstick" size={17} color={Colors.danger} />
+              <Text style={sh.title}>Vizag Chicken Rates</Text>
+            </View>
+            <Text style={styles.dateLine}>{lastUpdateLine}</Text>
+          </View>
+          <Pressable onPress={shareChickenRates} hitSlop={8} style={{ marginTop: 2 }}>
+            <Ionicons name="share-social-outline" size={20} color={Colors.textSecondary} />
+          </Pressable>
+        </View>
+        <View style={styles.chickenGrid}>
+          {CHICKEN_RATES.map((c, i) => (
+            <View key={c.id} style={[styles.chickenCard, { backgroundColor: CHICKEN_TINTS[i % CHICKEN_TINTS.length] }]}>
+              <Produce url={c.image_url} emoji={c.emoji} size={54} tint="transparent" radius={12} />
+              <Text style={styles.chickenName} numberOfLines={1}>{c.name}</Text>
+              <Text style={styles.chickenPrice}>₹{c.price}/{c.unit}</Text>
+            </View>
+          ))}
+        </View>
 
         {/* ── Shopping List ── */}
         <View style={{ height: Spacing.xl }} />
@@ -427,6 +468,15 @@ const styles = StyleSheet.create({
   favRow: { paddingHorizontal: Spacing.lg, gap: Spacing.md },
   favItem: { alignItems: 'center', gap: 6 },
   favPrice: { fontFamily: FontFamily.numMed, fontSize: FontSize.sm, color: Colors.textPrimary },
+
+  /* chicken rates */
+  chickenGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginHorizontal: Spacing.lg },
+  chickenCard: {
+    width: '47.6%', borderRadius: Radius.lg,
+    paddingVertical: Spacing.lg, paddingHorizontal: Spacing.md, alignItems: 'center',
+  },
+  chickenName: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary, marginTop: 8 },
+  chickenPrice: { fontFamily: FontFamily.numBold, fontSize: FontSize.md, color: Colors.textPrimary, marginTop: 2 },
 
   /* shopping list */
   shopGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, marginHorizontal: Spacing.lg },

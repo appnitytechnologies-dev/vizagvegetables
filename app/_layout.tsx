@@ -199,6 +199,8 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="shop-details" options={{ presentation: 'card' }} />
             <Stack.Screen name="market-detail" options={{ presentation: 'card' }} />
+            <Stack.Screen name="rythu-bazars" options={{ presentation: 'card' }} />
+            <Stack.Screen name="local-markets" options={{ presentation: 'card' }} />
             <Stack.Screen name="cart" options={{ presentation: 'card' }} />
             <Stack.Screen name="checkout-address" options={{ presentation: 'card' }} />
             <Stack.Screen name="checkout-payment" options={{ presentation: 'card' }} />

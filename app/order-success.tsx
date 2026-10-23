@@ -55,10 +55,12 @@ export default function OrderSuccess() {
 
         <Animated.View entering={FadeInDown.delay(500).springify()}>
           <Text style={styles.heading}>Order Placed! 🎉</Text>
-          <Text style={styles.eta}>
-            {method === 'cod'
-              ? 'Pay on delivery when it arrives'
-              : 'Payment received · Arriving in 45–60 mins'}
+        </Animated.View>
+
+        <Animated.View style={[styles.noticeBox, { opacity }]}>
+          <Text style={styles.noticeText}>
+            📞 Our team will contact you shortly to confirm your order. Once confirmed, we&apos;ll arrange payment with you.
+            You can check your order status anytime from My Orders.
           </Text>
         </Animated.View>
 
@@ -74,7 +76,7 @@ export default function OrderSuccess() {
           </View>
           <View style={styles.sep} />
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryKey}>Total Paid</Text>
+            <Text style={styles.summaryKey}>Total</Text>
             <Text style={[styles.summaryVal, { color: Colors.primary }]}>{displayAmt}</Text>
           </View>
         </Animated.View>
@@ -108,6 +110,8 @@ const styles = StyleSheet.create({
   checkMark: { fontSize: 52, color: Colors.textInverse },
   heading: { fontFamily: FontFamily.bold, fontSize: FontSize.xxxl, color: Colors.textPrimary, textAlign: 'center', letterSpacing: -0.3 },
   eta: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, textAlign: 'center', marginTop: Spacing.xs },
+  noticeBox: { width: '100%', backgroundColor: Colors.primaryPale, borderWidth: 1, borderColor: Colors.primary, borderRadius: Radius.lg, padding: Spacing.lg },
+  noticeText: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textPrimary, lineHeight: 20 },
   summaryCard: { width: '100%', backgroundColor: Colors.surface, borderRadius: Radius.lg, padding: Spacing.lg, gap: Spacing.md, ...Shadow.md, borderWidth: 1, borderColor: Colors.border },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
   summaryKey: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary },

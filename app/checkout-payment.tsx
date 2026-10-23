@@ -1,3 +1,6 @@
+/* LEGACY: not currently reachable — checkout-address.tsx places the order
+ * directly now (no online payment collected at checkout). Kept here for
+ * re-enablement once online payment is needed again. */
 import { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';

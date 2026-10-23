@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useDispatch } from 'react-redux';
 import { Colors } from '../constants/colors';
 import { FontFamily, FontSize } from '../constants/typography';
 import { Spacing, Radius, Shadow } from '../constants/spacing';
@@ -17,8 +18,11 @@ import { UserAddress, formatAddress } from '../lib/addressTypes';
 import StatePicker from '../components/ui/StatePicker';
 import StepperBar from '../components/StepperBar';
 import Divider from '../components/ui/Divider';
+import { clearCart } from '../store/cartSlice';
+import { AppDispatch } from '../store';
 
 const LABEL_ICON: Record<string, string> = { Home: '🏠', Office: '🏢', Other: '📍' };
+const DELIVERY_FEE = 30;
 
 const SLOTS = [
   { id: 'morning',  label: '6 AM – 9 AM',  icon: '🌅', sub: 'Early morning' },
@@ -162,14 +166,17 @@ function NewAddressForm({
 export default function CheckoutAddress() {
   const { items, total } = useCart();
   const count = items.length;
+  const dispatch = useDispatch<AppDispatch>();
+  const delivery = total >= 500 ? 0 : DELIVERY_FEE;
   const [addresses,    setAddresses]    = useState<UserAddress[]>([]);
   const [loadingAddrs, setLoadingAddrs] = useState(true);
   const [selectedId,   setSelectedId]  = useState<string | null>(null);
   const [useNew,       setUseNew]       = useState(false);
   const [newForm,      setNewForm]      = useState<NewAddrForm>(EMPTY);
   const [formErrors,   setFormErrors]   = useState<Errors>({});
-  const [slot,         setSlot]         = useState(SLOTS[1].label);
+  const [slot]                          = useState(SLOTS[1].label);
   const [error,        setError]        = useState('');
+  const [loading,      setLoading]      = useState(false);
 
   /* Load saved addresses */
   useEffect(() => {
@@ -233,10 +240,34 @@ export default function CheckoutAddress() {
     }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({
-      pathname: '/checkout-payment',
-      params: { address: deliveryAddress, slot },
-    } as any);
+
+    /* Place the order directly — no payment collected at checkout. The team
+     * confirms the order first, then arranges payment. Online payment via
+     * /checkout-payment (Razorpay) is disabled for now; see that screen for
+     * re-enablement once it's needed again. */
+    setLoading(true);
+    setError('');
+    try {
+      const orderItems = items.map(i => ({ product_id: i.id, quantity: i.quantity, unit_price: i.price }));
+      const res = await api.post<{ id: string }>('/api/orders', {
+        items:            orderItems,
+        delivery_address: deliveryAddress,
+        delivery_slot:    slot,
+        payment_method:   'cod',
+        delivery_fee:     delivery,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      dispatch(clearCart());
+      api.delete('/api/cart').catch(() => {});
+      router.replace({
+        pathname: '/order-success',
+        params: { id: res.id, method: 'cod', total: String(total + delivery) },
+      } as any);
+    } catch (e: any) {
+      setError(e.message || 'Failed to place order. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -341,30 +372,19 @@ export default function CheckoutAddress() {
             </View>
           )}
 
-          {/* ── Delivery Slot section ── */}
-          <Text style={[styles.sectionTitle, { marginTop: Spacing.sm }]}>Delivery Slot</Text>
-          <View style={styles.slotsCol}>
-            {SLOTS.map(s => (
-              <Pressable
-                key={s.id}
-                style={[styles.slotCard, slot === s.label && styles.slotCardActive]}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSlot(s.label); }}
-              >
-                <Text style={styles.slotIcon}>{s.icon}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.slotLabel, slot === s.label && styles.slotLabelActive]}>{s.label}</Text>
-                  <Text style={styles.slotSub}>{s.sub}</Text>
-                </View>
-                {slot === s.label && <Ionicons name="checkmark-circle" size={22} color={Colors.primary} />}
-              </Pressable>
-            ))}
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
       <View style={styles.bottomBar}>
-        <Pressable style={styles.continueBtn} onPress={handleContinue}>
-          <Text style={styles.continueText}>Continue to Payment — ₹{total}</Text>
+        <Pressable
+          style={[styles.continueBtn, loading && { opacity: 0.6 }]}
+          onPress={handleContinue}
+          disabled={loading}
+        >
+          {loading
+            ? <ActivityIndicator color={Colors.textInverse} size="small" />
+            : <Text style={styles.continueText}>Place Order — ₹{total + delivery}</Text>
+          }
         </Pressable>
       </View>
     </SafeAreaView>

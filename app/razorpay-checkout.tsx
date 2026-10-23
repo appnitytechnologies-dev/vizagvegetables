@@ -1,3 +1,6 @@
+/* LEGACY: not currently reachable — only linked from checkout-payment.tsx,
+ * which is itself disabled. Kept here for re-enablement once online payment
+ * is needed again. */
 import { useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
