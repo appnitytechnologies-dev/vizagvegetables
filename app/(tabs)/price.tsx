@@ -68,11 +68,11 @@ function toRate(p: ApiProduct): MarketRate {
 type Category = 'all' | 'vegetables' | 'fruits' | 'flowers' | 'leafy' | 'favourite';
 const CATEGORIES: { key: Category; label: string; icon?: string }[] = [
   { key: 'all', label: 'All' },
-  { key: 'vegetables', label: 'Vegetables', icon: '🥕' },
-  { key: 'fruits', label: 'Fruits', icon: '🍎' },
-  { key: 'flowers', label: 'Flowers', icon: '🌸' },
-  { key: 'leafy', label: 'Leaves', icon: '🌿' },
   { key: 'favourite', label: 'Favorites', icon: '❤️' },
+  { key: 'vegetables', label: 'Vegetables', icon: '🥕' },
+  { key: 'leafy', label: 'Leaves', icon: '🌿' },
+  { key: 'flowers', label: 'Flowers', icon: '🌸' },
+  { key: 'fruits', label: 'Fruits', icon: '🍎' },
 ];
 
 async function handleShare(item: MarketRate) {
