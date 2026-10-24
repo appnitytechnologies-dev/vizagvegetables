@@ -1,91 +1,145 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  Image,
+  ImageSourcePropType,
   StyleSheet,
   Pressable,
-  Dimensions,
-  FlatList,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
+  ActivityIndicator,
+  Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { router } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Haptics from 'expo-haptics';
-import Animated, {
-  FadeInDown,
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-} from 'react-native-reanimated';
-import { useSelector } from 'react-redux';
+import * as WebBrowser from 'expo-web-browser';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { GoogleSignin, isSuccessResponse, isErrorWithCode, statusCodes } from '@react-native-google-signin/google-signin';
+import { useDispatch, useSelector } from 'react-redux';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius, Shadow } from '../../constants/spacing';
-import { selectAuth } from '../../store/authSlice';
-import PricesIllustration from '../../components/illustrations/PricesIllustration';
-import MarketIllustration from '../../components/illustrations/MarketIllustration';
-import DeliveryIllustration from '../../components/illustrations/DeliveryIllustration';
+import { AppDispatch } from '../../store';
+import { loginSuccess, setGuest, selectPendingAction, selectAuth } from '../../store/authSlice';
+import { clearFavourites } from '../../store/favouritesSlice';
+import { api, setToken } from '../../lib/api';
+import { finishLogin } from '../../lib/authFlow';
+import GoogleIcon from '../../components/GoogleIcon';
 
-const { width, height: SCREEN_H } = Dimensions.get('window');
-const AMBER = '#F59E0B';
+const TERMS_URL   = 'https://www.yzagfresh.com/terms';
+const PRIVACY_URL = 'https://www.yzagfresh.com/privacy';
 
-interface Slide {
-  id: string;
-  eyebrow: string;
-  titleBefore: string;
-  titleHighlight: string;
-  titleAfter: string;
-  subtitle: string;
+/** login-hero.png is a full composition, not a texture: sky wash, the
+ *  photograph, leaf accents and the white curved sheet are all painted in.
+ *
+ *  resizeMode="cover" left the scale up to the layout engine, which magnified
+ *  the corner and pushed the photograph off screen. Sizing by width instead put
+ *  the artwork's bottom above the screen's, leaving a hard white seam under the
+ *  leaf accents. So the cover maths is done here: the artwork always fills the
+ *  screen, and because we know its offset and scale we also know exactly where
+ *  the photograph and the white sheet land. */
+const HERO_W = 941;
+const HERO_H = 1671;
+
+/** The artwork is a fixed composition, so text cannot be allowed to grow without
+ *  bound: a device with a large system font size pushed the cards into the
+ *  photograph and the sign-in block off the white sheet. Scaling still applies,
+ *  capped, so the screen stays readable without falling apart. */
+const MAX_FONT_SCALE = 1.15;
+
+/** Roughly the height of the sign-in stack (button, divider, skip, terms).
+ *  Used only to decide whether it still clears the bottom of the screen. */
+const SIGNIN_STACK_H = 150;
+
+/* Both constants below were measured off login-hero.png rather than eyeballed.
+ *
+ * The white sheet's top edge is a dome, not a straight line -- sampled across
+ * the artwork it starts at 0.745 dead centre but only 0.764 at 10%/90% and
+ * 0.777 at the extreme edges. The sign-in button spans nearly the full width,
+ * so its ENDS are what must clear the photograph; anchoring to the centre peak
+ * is what left the button overlapping the crate on a real device. */
+const WHITE_TOP = 0.765;
+
+/** The photograph starts at 0.495 mid-frame and 0.538 toward the edges; this
+ *  leaves a little margin under the cards. */
+const PHOTO_TOP = 0.48;
+
+interface Feature {
+  icon: ImageSourcePropType;
+  title: string;
+  body: string;
+  tint: string;
+  /** The heart sits in a white disc in the design; the other two do not. */
+  disc?: boolean;
 }
 
-const SLIDES: Slide[] = [
+const FEATURES: Feature[] = [
   {
-    id: '1',
-    eyebrow: 'EVERY MORNING, FRESH',
-    titleBefore: 'Check ',
-    titleHighlight: "today's Rythu Bazar",
-    titleAfter: ' prices before you leave home',
-    subtitle: 'ప్రతిరోజూ తాజా మార్కెట్ ధరలు',
+    icon: require('../../assets/images/veg.png'),
+    title: 'Daily Rythu\nBazar Rates',
+    body: 'Get latest vegetable\n& fruit prices',
+    tint: 'rgba(234,246,234,0.9)',
   },
   {
-    id: '2',
-    eyebrow: 'ALWAYS CLOSE BY',
-    titleBefore: 'Find the ',
-    titleHighlight: 'nearest open market',
-    titleAfter: ' around you in seconds',
-    subtitle: 'మీ దగ్గర్లోని రైతు బజార్లు',
+    icon: require('../../assets/images/market-update.png'),
+    title: 'Market\nUpdates',
+    body: 'Find nearby markets,\ntimings & more',
+    tint: 'rgba(253,244,227,0.9)',
   },
   {
-    id: '3',
-    eyebrow: 'FARM TO YOUR DOOR',
-    titleBefore: 'Order ',
-    titleHighlight: 'fresh vegetables',
-    titleAfter: ' and get them delivered fast',
-    subtitle: 'ఇంటికే తాజా కూరగాయలు',
+    icon: require('../../assets/images/your-fav.png'),
+    title: 'Your\nFavourites',
+    body: 'Save your favourite\nitems and track prices',
+    tint: 'rgba(234,241,251,0.9)',
+    disc: true,
   },
 ];
 
-function SlideIllustration({ id, size }: { id: string; size: number }) {
-  if (id === '1') return <PricesIllustration size={size} />;
-  if (id === '2') return <MarketIllustration size={size} />;
-  return <DeliveryIllustration size={size} />;
-}
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
 export default function GetStarted() {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [listHeight, setListHeight] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
-  const btnScale = useSharedValue(1);
+  const insets = useSafeAreaInsets();
+  const { width: screenW, height: screenH } = useWindowDimensions();
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [error,         setError]         = useState('');
+  const dispatch = useDispatch<AppDispatch>();
+  const pendingAction = useSelector(selectPendingAction);
   const auth = useSelector(selectAuth);
 
-  // Safety net — splash.tsx already routes a logged-in user straight past
-  // this screen, but this covers edge cases like backing out of a later
-  // screen. A Google login started but never finished (phone still missing)
-  // shouldn't silently sit "logged in" with a broken account either.
+  // Cover: scale until both axes are filled, then centre the overflow.
+  const scale   = Math.max(screenW / HERO_W, screenH / HERO_H);
+  const heroW   = HERO_W * scale;
+  const heroH   = HERO_H * scale;
+  const offsetX = (screenW - heroW) / 2;
+  const offsetY = (screenH - heroH) / 2;
+
+  const photoTop = offsetY + heroH * PHOTO_TOP;
+  const whiteTop = offsetY + heroH * WHITE_TOP;
+
+  // Normally the sign-in stack sits just below the white sheet. On a short
+  // screen with a three-button navigation bar there isn't room for it there, so
+  // it slides up rather than running off the bottom -- overlapping the curve a
+  // little is far less bad than losing the terms line off screen.
+  const signInTop = Math.min(
+    whiteTop + Spacing.md,
+    screenH - insets.bottom - Spacing.sm - SIGNIN_STACK_H,
+  );
+
+  // On a short screen the stack has to sit above the artwork's own white sheet,
+  // which would put the button back on the photograph. Extend the sheet upward
+  // with a matching white panel in that case only, so taller screens keep the
+  // artwork's leaf accents untouched.
+  const needsPanel = signInTop < whiteTop;
+
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    });
+  }, []);
+
+  // Safety net — splash.tsx already routes a logged-in user past this screen,
+  // but this covers backing out of a later screen. A Google login started but
+  // never finished (phone still missing) shouldn't sit here looking logged out.
   useEffect(() => {
     if (auth.isLoggedIn && auth.phone) {
       router.replace('/(tabs)/home');
@@ -94,219 +148,333 @@ export default function GetStarted() {
     }
   }, [auth.isLoggedIn, auth.phone]);
 
-  const btnStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: btnScale.value }],
-  }));
+  const handleGooglePress = async () => {
+    const configured = !!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+      && !process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.startsWith('REPLACE_ME');
 
-  const isLast = activeIndex === SLIDES.length - 1;
+    if (!configured) {
+      Alert.alert(
+        'Not configured',
+        'Google Sign-In is not set up yet.\n\nAdd your Google Client IDs to the .env file and configure the OAuth app in Google Cloud Console.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
 
-  // Illustration area = 56% of slide height; illustration SVG fills 90% of that
-  const slideHeight = listHeight > 0 ? listHeight : SCREEN_H * 0.72;
-  const illusAreaH  = slideHeight * 0.56;
-  const illusSize   = Math.min(illusAreaH * 0.90, width * 0.84, 300);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setGoogleLoading(true);
+    setError('');
+    try {
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
+      if (!isSuccessResponse(response)) {
+        // user cancelled — not an error
+        return;
+      }
+      const idToken = response.data.idToken;
+      if (!idToken) throw new Error('Google did not return an ID token');
 
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const index = Math.round(e.nativeEvent.contentOffset.x / width);
-    setActiveIndex(index);
-  };
+      const res = await api.post<{
+        token: string;
+        user: { id: string; phone: string; name: string };
+        isNewUser: boolean;
+        needsProfile: boolean;
+      }>('/api/auth/google', { idToken });
 
-  const handleNext = () => {
-    btnScale.value = withSpring(0.95, { damping: 10 }, () => {
-      btnScale.value = withSpring(1, { damping: 12 });
-    });
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (!isLast) {
-      flatListRef.current?.scrollToOffset({
-        offset: (activeIndex + 1) * width,
-        animated: true,
-      });
-    } else {
-      router.push('/(auth)/otp-number');
+      await setToken(res.token);
+      dispatch(loginSuccess({ token: res.token, id: res.user.id, phone: res.user.phone || '', name: res.user.name || '' }));
+
+      if (res.needsProfile) {
+        router.replace({ pathname: '/(auth)/complete-profile', params: { name: res.user.name || '' } });
+      } else {
+        await finishLogin(dispatch, pendingAction);
+      }
+    } catch (e: any) {
+      if (isErrorWithCode(e) && e.code === statusCodes.SIGN_IN_CANCELLED) {
+        // user cancelled — not an error
+      } else {
+        setError(e.message || 'Google sign-in failed. Please try again.');
+      }
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
   const handleSkip = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push('/(auth)/otp-number');
+    dispatch(setGuest());
+    dispatch(clearFavourites());
+    router.replace('/(tabs)/home');
+  };
+
+  const openLink = (url: string) => {
+    WebBrowser.openBrowserAsync(url).catch(() => {});
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="light" />
+    <View style={styles.root}>
+      <StatusBar style="dark" />
 
-      {/* ── Header ── */}
-      <Animated.View entering={FadeInDown.delay(80).duration(420)} style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerEmoji}>🔥</Text>
-          <Text style={styles.headerTitle}>YZAG Fresh</Text>
-        </View>
-        {!isLast && (
-          <Pressable onPress={handleSkip} hitSlop={14}>
-            <Text style={styles.skipText}>Skip</Text>
-          </Pressable>
-        )}
-      </Animated.View>
+      <View style={styles.heroClip} pointerEvents="none">
+        <Image
+          source={require('../../assets/images/login-hero.png')}
+          style={{ position: 'absolute', left: offsetX, top: offsetY, width: heroW, height: heroH }}
+        />
+      </View>
 
-      {/* ── Slides ── */}
-      <FlatList
-        ref={flatListRef}
-        data={SLIDES}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        scrollEventThrottle={16}
-        onScroll={handleScroll}
-        onLayout={e => setListHeight(e.nativeEvent.layout.height)}
-        keyExtractor={item => item.id}
-        style={styles.list}
-        renderItem={({ item }) => (
-          <View style={[styles.slide, { width, height: slideHeight }]}>
+      {/* Everything above the photograph */}
+      <View
+        style={[
+          styles.top,
+          { paddingTop: insets.top + Spacing.sm, height: photoTop },
+        ]}
+      >
+        <Animated.View entering={FadeInDown.delay(60).duration(420)} style={styles.brandWrap}>
+          <Image
+            source={require('../../assets/images/icon.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+          <Text style={styles.tagline} maxFontSizeMultiplier={MAX_FONT_SCALE}>FRESH MARKETS   BRIGHTER TOMORROW</Text>
+        </Animated.View>
 
-            {/* Illustration — fixed proportional height */}
-            <View style={[styles.illustrationArea, { height: illusAreaH }]}>
-              <SlideIllustration id={item.id} size={illusSize} />
+        <Animated.Text entering={FadeInDown.delay(140).duration(420)} style={styles.heading} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+          Your Local Market Companion
+        </Animated.Text>
+
+        <Animated.View entering={FadeInDown.delay(220).duration(420)} style={styles.cardsRow}>
+          {FEATURES.map(f => (
+            <View key={f.title} style={[styles.card, { backgroundColor: f.tint }]}>
+              {f.disc
+                ? <View style={styles.disc}>
+                    <Image source={f.icon} style={styles.discIcon} resizeMode="contain" />
+                  </View>
+                : <Image source={f.icon} style={styles.cardIcon} resizeMode="contain" />
+              }
+              <Text style={styles.cardTitle} maxFontSizeMultiplier={MAX_FONT_SCALE}>{f.title}</Text>
+              <Text style={styles.cardBody} maxFontSizeMultiplier={MAX_FONT_SCALE}>{f.body}</Text>
             </View>
-
-            {/* Text block */}
-            <View style={styles.textBlock}>
-              <Text style={styles.eyebrow}>{item.eyebrow}</Text>
-              <Text style={styles.title}>
-                {item.titleBefore}
-                <Text style={styles.titleHighlight}>{item.titleHighlight}</Text>
-                {item.titleAfter}
-              </Text>
-              <Text style={styles.teluguSubtitle}>{item.subtitle}</Text>
-            </View>
-
-          </View>
-        )}
-      />
-
-      {/* ── Bottom: button + dots ── */}
-      <Animated.View entering={FadeInDown.delay(220).duration(420)} style={styles.bottom}>
-        <AnimatedPressable style={[styles.button, btnStyle]} onPress={handleNext}>
-          <Text style={styles.buttonText}>
-            {isLast ? 'Get Started' : 'Next  →'}
-          </Text>
-        </AnimatedPressable>
-
-        <View style={styles.dotsRow}>
-          {SLIDES.map((_, i) => (
-            <View key={i} style={[styles.dot, activeIndex === i && styles.dotActive]} />
           ))}
+        </Animated.View>
+      </View>
+
+      {needsPanel && (
+        <View
+          pointerEvents="none"
+          style={[styles.signInPanel, { top: signInTop - Spacing.md }]}
+        />
+      )}
+
+      {/* Anchored to the white sheet painted in the artwork */}
+      <Animated.View
+        entering={FadeInDown.delay(300).duration(420)}
+        style={[
+          styles.bottom,
+          { top: signInTop, paddingBottom: insets.bottom + Spacing.sm },
+        ]}
+      >
+        {!!error && <Text style={styles.errorText} maxFontSizeMultiplier={MAX_FONT_SCALE}>{error}</Text>}
+
+        <Pressable
+          style={[styles.googleBtn, googleLoading && styles.googleBtnDisabled]}
+          onPress={handleGooglePress}
+          disabled={googleLoading}
+        >
+          {googleLoading
+            ? <ActivityIndicator size="small" color={Colors.textMuted} />
+            : <>
+                <GoogleIcon size={24} />
+                <Text style={styles.googleText} maxFontSizeMultiplier={MAX_FONT_SCALE}>Continue with Google</Text>
+              </>
+          }
+        </Pressable>
+
+        <View style={styles.orRow}>
+          <View style={styles.orLine} />
+          <Text style={styles.orText} maxFontSizeMultiplier={MAX_FONT_SCALE}>OR</Text>
+          <View style={styles.orLine} />
         </View>
+
+        <Pressable onPress={handleSkip} hitSlop={12}>
+          <Text style={styles.skipText} maxFontSizeMultiplier={MAX_FONT_SCALE}>Skip for now</Text>
+        </Pressable>
+
+        <Text style={styles.terms} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+          By continuing, you agree to our{'\n'}
+          <Text style={styles.link} onPress={() => openLink(TERMS_URL)}>Terms of Service</Text>
+          {' and '}
+          <Text style={styles.link} onPress={() => openLink(PRIVACY_URL)}>Privacy Policy</Text>
+        </Text>
       </Animated.View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.primary,
+  root: { flex: 1, backgroundColor: Colors.surface },
+
+  heroClip: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+
+  top: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: Spacing.xl,
   },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.xxl,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.sm,
+  brandWrap: { alignItems: 'center' },
+  logo: {
+    width: 170,
+    height: 80,
   },
-  headerLeft: {
+  tagline: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: 9.5,
+    letterSpacing: 1.4,
+    color: Colors.primaryDark,
+    marginTop: 2,
+  },
+
+  heading: {
+    fontFamily: FontFamily.bold,
+    fontSize: 20,
+    color: Colors.primaryDark,
+    textAlign: 'center',
+    marginTop: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+
+  cardsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: Spacing.sm,
   },
-  headerEmoji: { fontSize: 20 },
-  headerTitle: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.lg,
-    color: Colors.textInverse,
-  },
-  skipText: {
-    fontFamily: FontFamily.semiBold,
-    fontSize: FontSize.md,
-    color: Colors.textInverse,
-    opacity: 0.82,
-  },
-
-  list: { flex: 1 },
-  slide: { flexDirection: 'column' },
-
-  illustrationArea: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  textBlock: {
+  card: {
     flex: 1,
-    paddingHorizontal: Spacing.xxl,
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+  },
+  cardIcon: {
+    width: 50,
+    height: 34,
+    marginBottom: 6,
+  },
+  disc: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: Spacing.sm,
+    // The heart fills only the middle ~32% x 60% of your-fav.png; the rest is
+    // transparent padding. Sizing the image to the padding made the heart tiny,
+    // so it is sized to the artwork instead and the disc clips what spills out.
+    overflow: 'hidden',
   },
-  eyebrow: {
-    fontFamily: FontFamily.semiBold,
-    fontSize: FontSize.xs,
-    color: 'rgba(255,255,255,0.65)',
-    letterSpacing: 2.5,
-    textTransform: 'uppercase',
-    marginBottom: Spacing.sm,
+  discIcon: {
+    width: 62,
+    height: 41,
   },
-  title: {
+  cardTitle: {
     fontFamily: FontFamily.bold,
-    fontSize: 27,
-    color: Colors.textInverse,
+    fontSize: 13,
+    lineHeight: 17,
+    color: Colors.primaryDark,
     textAlign: 'center',
-    lineHeight: 38,
-    letterSpacing: -0.3,
-    marginBottom: Spacing.sm,
+    marginTop: 4,
+    marginBottom: 2,
   },
-  titleHighlight: { color: AMBER },
-  teluguSubtitle: {
+  cardBody: {
     fontFamily: FontFamily.regular,
-    fontSize: FontSize.sm,
-    color: 'rgba(255,255,255,0.60)',
+    fontSize: 10.5,
+    lineHeight: 13,
+    color: Colors.textSecondary,
     textAlign: 'center',
+  },
+
+  signInPanel: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 44,
+    borderTopRightRadius: 44,
   },
 
   bottom: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     paddingHorizontal: Spacing.xxl,
-    paddingBottom: Spacing.xxxl,
     alignItems: 'center',
-    gap: Spacing.lg,
+    justifyContent: 'flex-start',
+    gap: Spacing.sm,
   },
-  button: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.full,
-    paddingVertical: Spacing.lg,
-    width: '100%',
+
+  errorText: {
+    fontFamily: FontFamily.medium,
+    fontSize: FontSize.sm,
+    color: Colors.danger,
+    textAlign: 'center',
+  },
+
+  googleBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.md,
+    width: '100%',
+    minHeight: 52,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.surface,
     ...Shadow.md,
   },
-  buttonText: {
-    fontFamily: FontFamily.semiBold,
-    fontSize: FontSize.md,
-    color: Colors.primaryDark,
-    letterSpacing: 0.2,
+  googleBtnDisabled: { opacity: 0.6 },
+  googleText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.lg,
+    color: Colors.textPrimary,
   },
-  dotsRow: {
+
+  orRow: {
     flexDirection: 'row',
-    gap: 6,
     alignItems: 'center',
+    gap: Spacing.md,
+    width: '84%',
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: Radius.full,
-    backgroundColor: 'rgba(255,255,255,0.32)',
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: Colors.borderStrong,
+    opacity: 0.35,
   },
-  dotActive: {
-    width: 26,
-    height: 8,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.textInverse,
+  orText: {
+    fontFamily: FontFamily.semiBold,
+    fontSize: FontSize.sm,
+    color: Colors.textSecondary,
+    letterSpacing: 1,
+  },
+
+  skipText: {
+    fontFamily: FontFamily.bold,
+    fontSize: FontSize.lg,
+    color: Colors.primaryAccent,
+  },
+
+  terms: {
+    fontFamily: FontFamily.regular,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
+  link: {
+    fontFamily: FontFamily.medium,
+    color: Colors.primaryAccent,
+    textDecorationLine: 'underline',
   },
 });

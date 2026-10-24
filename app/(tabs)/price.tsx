@@ -1,27 +1,32 @@
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, TextInput, ScrollView, ActivityIndicator, Alert, Dimensions } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
-import { LinearGradient } from 'expo-linear-gradient';
+import {
+  View, Text, StyleSheet, FlatList, Pressable,
+  TextInput, ScrollView, ActivityIndicator, Dimensions,
+  Modal, KeyboardAvoidingView, Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useSelector } from 'react-redux';
 import { Colors } from '../../constants/colors';
 import { FontFamily, FontSize } from '../../constants/typography';
 import { Spacing, Radius, Shadow } from '../../constants/spacing';
+import { TINTS } from '../../constants/tints';
 import { api, ApiProduct, imgUrl } from '../../lib/api';
 import { Image } from 'expo-image';
-import { selectAuth } from '../../store/authSlice';
 import { useFavourites } from '../../hooks/useFavourites';
+import { useAuthGuard } from '../../hooks/useAuthGuard';
+import { useLocation } from '../../hooks/useLocation';
 import { shareProduct } from '../../lib/share';
-import Badge from '../../components/ui/Badge';
 
 const SCREEN_W = Dimensions.get('window').width;
-const H_PAD    = Spacing.md;
+const H_PAD    = Spacing.lg;
 const COL_GAP  = Spacing.sm;
 const CARD_W   = (SCREEN_W - H_PAD * 2 - COL_GAP) / 2;
 const IMG_H    = CARD_W * 0.85;
+
+type Lang = 'en' | 'te';
 
 /* local shape the UI expects */
 export interface MarketRate {
@@ -60,26 +65,15 @@ function toRate(p: ApiProduct): MarketRate {
   };
 }
 
-type Category = 'all' | 'vegetables' | 'fruits' | 'leafy' | 'flowers' | 'favourite';
-const CATEGORIES: { key: Category; label: string }[] = [
+type Category = 'all' | 'vegetables' | 'fruits' | 'flowers' | 'leafy' | 'favourite';
+const CATEGORIES: { key: Category; label: string; icon?: string }[] = [
   { key: 'all', label: 'All' },
-  { key: 'favourite', label: 'Favorite' },
-  { key: 'vegetables', label: 'Vegetables' },
-  { key: 'fruits', label: 'Fruits' },
-  { key: 'flowers', label: 'Flowers' },
-  { key: 'leafy', label: 'Leafs' },
+  { key: 'favourite', label: 'Favorites', icon: '❤️' },
+  { key: 'vegetables', label: 'Vegetables', icon: '🥕' },
+  { key: 'leafy', label: 'Leaves', icon: '🌿' },
+  { key: 'flowers', label: 'Flowers', icon: '🌸' },
+  { key: 'fruits', label: 'Fruits', icon: '🍎' },
 ];
-
-
-function ShareIcon() {
-  return (
-    <Svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-      <Path d="M9 12C9 12.663 8.73661 13.2989 8.26777 13.7678C7.79893 14.2366 7.16304 14.5 6.5 14.5C5.83696 14.5 5.20107 14.2366 4.73223 13.7678C4.26339 13.2989 4 12.663 4 12C4 11.337 4.26339 10.7011 4.73223 10.2322C5.20107 9.76339 5.83696 9.5 6.5 9.5C7.16304 9.5 7.79893 9.76339 8.26777 10.2322C8.73661 10.7011 9 11.337 9 12Z" stroke="#9C9C9C" strokeWidth="1.5" />
-      <Path d="M14 6.5L9 10M14 17.5L9 14" stroke="#9C9C9C" strokeWidth="1.5" strokeLinecap="round" />
-      <Path d="M19 18.5C19 19.163 18.7366 19.7989 18.2678 20.2678C17.7989 20.7366 17.163 21 16.5 21C15.837 21 15.2011 20.7366 14.7322 20.2678C14.2634 19.7989 14 19.163 14 18.5C14 17.837 14.2634 17.2011 14.7322 16.7322C15.2011 16.2634 15.837 16 16.5 16C17.163 16 17.7989 16.2634 18.2678 16.7322C18.7366 17.2011 19 17.837 19 18.5ZM19 5.5C19 6.16304 18.7366 6.79893 18.2678 7.26777C17.7989 7.73661 17.163 8 16.5 8C15.837 8 15.2011 7.73661 14.7322 7.26777C14.2634 6.79893 14 6.16304 14 5.5C14 4.83696 14.2634 4.20107 14.7322 3.73223C15.2011 3.26339 15.837 3 16.5 3C17.163 3 17.7989 3.26339 18.2678 3.73223C18.7366 4.20107 19 4.83696 19 5.5Z" stroke="#9C9C9C" strokeWidth="1.5" />
-    </Svg>
-  );
-}
 
 async function handleShare(item: MarketRate) {
   await shareProduct({
@@ -91,77 +85,58 @@ async function handleShare(item: MarketRate) {
   });
 }
 
-function PriceRowItem({ item, isFav, onToggleFav }: { item: MarketRate; isFav: boolean; onToggleFav: () => void }) {
+function PriceRowItem({ item, tint, label, subLabel, isFav, onToggleFav }: {
+  item: MarketRate; tint: string; label: string; subLabel: string; isFav: boolean; onToggleFav: () => void;
+}) {
   return (
     <View style={listStyles.row}>
-      {/* Image */}
-      <View style={listStyles.imgWrap}>
+      <View style={[listStyles.imgWrap, { backgroundColor: tint }]}>
         {item.image_url
           ? <Image source={{ uri: item.image_url }} style={listStyles.img} contentFit="contain" />
           : <Text style={listStyles.emoji}>{item.emoji}</Text>
         }
       </View>
 
-      {/* Info */}
       <View style={listStyles.info}>
-        {!!item.te && <Text style={listStyles.te} numberOfLines={1}>{item.te}</Text>}
-        <Text style={listStyles.name} numberOfLines={1}>{item.name}</Text>
-        <Text style={listStyles.price}>
-          ₹{item.today}<Text style={listStyles.unit}>/{item.unit}</Text>
-        </Text>
+        <Text style={listStyles.name} numberOfLines={1}>{label}</Text>
+        {!!subLabel && <Text style={listStyles.te} numberOfLines={1}>{subLabel}</Text>}
       </View>
 
-      {/* Right: badge + actions */}
-      <View style={listStyles.right}>
-        <Badge chg={item.chg} />
-        <View style={listStyles.actions}>
-          <Pressable onPress={onToggleFav} hitSlop={8}>
-            <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={16} color={isFav ? Colors.danger : Colors.textMuted} />
-          </Pressable>
-          <Pressable onPress={() => handleShare(item)} hitSlop={8}>
-            <ShareIcon />
-          </Pressable>
-        </View>
-      </View>
+      <Text style={listStyles.price}>₹{item.today}<Text style={listStyles.unit}>/{item.unit}</Text></Text>
+
+      <Pressable onPress={onToggleFav} hitSlop={8} style={listStyles.heartBtn}>
+        <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={18} color={isFav ? Colors.danger : Colors.textMuted} />
+      </Pressable>
+      <Pressable style={listStyles.shareBtn} onPress={() => handleShare(item)} hitSlop={8}>
+        <Ionicons name="share-social-outline" size={14} color={Colors.primaryAccent} />
+      </Pressable>
     </View>
   );
 }
 
-function PriceGridItem({ item, isFav, onToggleFav }: { item: MarketRate; isFav: boolean; onToggleFav: () => void }) {
+function PriceGridItem({ item, tint, label, subLabel, isFav, onToggleFav }: {
+  item: MarketRate; tint: string; label: string; subLabel: string; isFav: boolean; onToggleFav: () => void;
+}) {
   return (
     <View style={gridStyles.card}>
-      {/* Image area */}
-      <View style={gridStyles.imgBox}>
+      <View style={[gridStyles.imgBox, { backgroundColor: tint }]}>
         {item.image_url
           ? <Image source={{ uri: item.image_url }} style={gridStyles.img} contentFit="contain" />
           : <View style={gridStyles.imgFallback}><Text style={gridStyles.emoji}>{item.emoji}</Text></View>
         }
-        {/* Heart overlay */}
         <Pressable style={gridStyles.heartBtn} onPress={onToggleFav} hitSlop={6}>
           <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={15} color={isFav ? Colors.danger : Colors.textMuted} />
         </Pressable>
       </View>
 
-      {/* Info area */}
       <View style={gridStyles.info}>
-        <View style={gridStyles.nameRow}>
-          <Text style={gridStyles.name} numberOfLines={1}>{item.name}</Text>
-          <Text style={gridStyles.unit}>{item.unit}</Text>
-        </View>
-        {!!item.te && <Text style={gridStyles.te} numberOfLines={1}>{item.te}</Text>}
+        <Text style={gridStyles.name} numberOfLines={1}>{label}</Text>
+        {!!subLabel && <Text style={gridStyles.te} numberOfLines={1}>{subLabel}</Text>}
         <View style={gridStyles.footer}>
-          <View style={gridStyles.priceRow}>
-            <Text style={gridStyles.price}>₹{item.today}</Text>
-            {item.prev > 0 && item.prev !== item.today && (
-              <Text style={gridStyles.prev}>₹{item.prev}</Text>
-            )}
-          </View>
-          <View style={gridStyles.footerRight}>
-            <Badge chg={item.chg} />
-            <Pressable onPress={() => handleShare(item)} hitSlop={8}>
-              <ShareIcon />
-            </Pressable>
-          </View>
+          <Text style={gridStyles.price}>₹{item.today}<Text style={gridStyles.unit}>/{item.unit}</Text></Text>
+          <Pressable style={gridStyles.shareBtn} onPress={() => handleShare(item)} hitSlop={6}>
+            <Ionicons name="share-social-outline" size={14} color={Colors.primaryAccent} />
+          </Pressable>
         </View>
       </View>
     </View>
@@ -177,27 +152,23 @@ export default function PriceScreen() {
       setCategory(cat as Category);
     }
   }, [cat]);
+
   const [query, setQuery] = useState('');
   const [isGrid, setIsGrid] = useState(true);
   const [rates, setRates] = useState<MarketRate[]>([]);
   const [loading, setLoading] = useState(true);
   const { ids, toggle } = useFavourites();
-  const auth = useSelector(selectAuth);
+  const { guard } = useAuthGuard();
+  const { locationText, loading: locLoading, isCustom, setCustomLocation, resetToGPS } = useLocation();
+  const [locationModal, setLocationModal] = useState(false);
+  const [locationInput, setLocationInput] = useState('');
 
-  const handleToggleFav = (id: string) => {
-    if (!auth.isLoggedIn) {
-      Alert.alert(
-        'Login Required',
-        'Please log in to save favourites',
-        [
-          { text: 'Not now', style: 'cancel' },
-          { text: 'Login', onPress: () => router.push('/(auth)/otp-number' as any) },
-        ]
-      );
-      return;
-    }
-    toggle(id);
-  };
+  const [lang, setLang] = useState<Lang>('en');
+  const label = (it: { name: string; te: string }) => (lang === 'te' && it.te ? it.te : it.name);
+  const subLabel = (it: { name: string; te: string }) => (lang === 'te' ? it.name : it.te);
+
+  const handleToggleFav = (id: string) =>
+    guard({ type: 'TOGGLE_FAVOURITE', payload: id, returnTo: '/(tabs)/price' }, () => toggle(id));
 
   useEffect(() => {
     api.get<ApiProduct[]>('/api/market-rates?limit=500')
@@ -216,11 +187,12 @@ export default function PriceScreen() {
     return matchCat && matchQ;
   });
 
-  const today = new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  const now = new Date();
+  const dateLine = `${now.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} | ${now.toLocaleDateString('en-IN', { weekday: 'long' })} • Updated ${now.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}`;
 
   if (loading) return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
@@ -229,46 +201,75 @@ export default function PriceScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
 
-      <LinearGradient
-        colors={['#1B5E35', '#4CAF6F']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0.4, y: 1 }}
-        style={styles.header}
-      >
-        <View style={styles.titleRow}>
-          <View>
-            <Text style={styles.title}>Today’s Prices</Text>
-            <Text style={styles.telugu}>రైతు బజార్ కూరగాయల ధరలు</Text>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={styles.date}>{today}</Text>
-            <Text style={styles.updated}>Updated 7:00 AM</Text>
+      {/* ── Header ── */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <Image
+            source={require('../../assets/images/home-logo.png')}
+            style={styles.logo}
+            contentFit="contain"
+            contentPosition="left"
+          />
+          <View style={styles.headerActions}>
+            <Pressable
+              style={[styles.circleBtn, lang === 'te' && styles.circleBtnActive]}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setLang(l => (l === 'en' ? 'te' : 'en')); }}
+              hitSlop={6}
+            >
+              <MaterialIcons name="translate" size={19} color={lang === 'te' ? Colors.textInverse : Colors.textPrimary} />
+            </Pressable>
+            <Pressable style={styles.circleBtn} onPress={() => router.push('/notifications' as any)} hitSlop={6}>
+              <Ionicons name="notifications-outline" size={19} color={Colors.textPrimary} />
+            </Pressable>
           </View>
         </View>
+
+        <Pressable
+          style={styles.locRow}
+          onPress={() => { setLocationInput(locationText); setLocationModal(true); }}
+          hitSlop={6}
+        >
+          <Ionicons name="location-sharp" size={13} color={Colors.primaryAccent} />
+          <Text style={styles.locText} numberOfLines={1}>
+            {locLoading ? '…' : (locationText || 'Visakhapatnam')}
+          </Text>
+          <Ionicons name="chevron-down" size={11} color={Colors.textMuted} />
+        </Pressable>
+
         <View style={styles.searchRow}>
-          <View style={styles.searchBar}>
-            <Ionicons name="search-outline" size={16} color={Colors.textMuted} />
+          <View style={styles.search}>
+            <Ionicons name="search" size={17} color={Colors.textMuted} />
             <TextInput
               style={styles.searchInput}
-              placeholder={`${rates.length} items  Search vegetables, fruits, flowers...`}
+              placeholder="Search vegetables, fruits…"
               placeholderTextColor={Colors.textMuted}
               value={query}
               onChangeText={setQuery}
+              underlineColorAndroid="transparent"
+              returnKeyType="search"
             />
           </View>
           <Pressable style={styles.toggleBtn} onPress={() => setIsGrid(g => !g)}>
-            <Ionicons name={isGrid ? 'list-outline' : 'grid-outline'} size={16} color={Colors.primary} />
-            <Text style={styles.toggleText}>{isGrid ? 'List' : 'Grid'}</Text>
+            <Ionicons name={isGrid ? 'grid-outline' : 'list-outline'} size={15} color={Colors.textInverse} />
+            <Text style={styles.toggleText}>{isGrid ? 'Grid' : 'List'}</Text>
           </Pressable>
         </View>
-      </LinearGradient>
+      </View>
 
+      {/* ── Title + date ── */}
+      <View style={styles.rateHead}>
+        <Text style={styles.pageTitle}>Today&apos;s Rythu Bazar Rates</Text>
+        <Text style={styles.dateLine}>{dateLine}</Text>
+      </View>
+
+      {/* ── Category chips ── */}
       <View style={styles.chipsRow}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.chipsContent}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsContent}>
           {CATEGORIES.map(c => (
             <Pressable key={c.key} style={[styles.tab, category === c.key && styles.tabActive]} onPress={() => setCategory(c.key)}>
+              {!!c.icon && <Text style={styles.tabIcon}>{c.icon}</Text>}
               <Text style={[styles.tabLabel, category === c.key && styles.tabLabelActive]}>{c.label}</Text>
             </Pressable>
           ))}
@@ -284,9 +285,16 @@ export default function PriceScreen() {
           showsVerticalScrollIndicator={false}
           style={{ flex: 1 }}
           columnWrapperStyle={{ gap: COL_GAP, paddingHorizontal: H_PAD }}
-          contentContainerStyle={{ gap: COL_GAP, paddingTop: Spacing.md, paddingBottom: 100 }}
-          renderItem={({ item }) => (
-            <PriceGridItem item={item} isFav={ids.includes(item.id)} onToggleFav={() => handleToggleFav(item.id)} />
+          contentContainerStyle={{ gap: COL_GAP, paddingTop: Spacing.sm, paddingBottom: 100 }}
+          renderItem={({ item, index }) => (
+            <PriceGridItem
+              item={item}
+              tint={TINTS[index % TINTS.length]}
+              label={label(item)}
+              subLabel={subLabel(item)}
+              isFav={ids.includes(item.id)}
+              onToggleFav={() => handleToggleFav(item.id)}
+            />
           )}
         />
       ) : (
@@ -295,10 +303,56 @@ export default function PriceScreen() {
           data={filtered}
           keyExtractor={i => i.id}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: Spacing.md, paddingBottom: 100, gap: Spacing.sm }}
-          renderItem={({ item }) => <PriceRowItem item={item} isFav={ids.includes(item.id)} onToggleFav={() => handleToggleFav(item.id)} />}
+          contentContainerStyle={{ paddingTop: Spacing.sm, paddingHorizontal: H_PAD, paddingBottom: 100, gap: Spacing.sm }}
+          renderItem={({ item, index }) => (
+            <PriceRowItem
+              item={item}
+              tint={TINTS[index % TINTS.length]}
+              label={label(item)}
+              subLabel={subLabel(item)}
+              isFav={ids.includes(item.id)}
+              onToggleFav={() => handleToggleFav(item.id)}
+            />
+          )}
         />
       )}
+
+      {/* Location picker modal */}
+      <Modal visible={locationModal} transparent animationType="fade" onRequestClose={() => setLocationModal(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={locModal.overlay}>
+          <Pressable style={locModal.backdrop} onPress={() => setLocationModal(false)} />
+          <View style={locModal.sheet}>
+            <Text style={locModal.title}>Set your area</Text>
+            <Text style={locModal.sub}>Type your neighbourhood, area or city name</Text>
+            <TextInput
+              style={locModal.input}
+              placeholder="e.g. Gajuwaka, Vizag"
+              placeholderTextColor={Colors.textMuted}
+              value={locationInput}
+              onChangeText={setLocationInput}
+              autoFocus
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                if (locationInput.trim()) { setCustomLocation(locationInput.trim()); setLocationModal(false); }
+              }}
+            />
+            <Pressable
+              style={[locModal.saveBtn, !locationInput.trim() && locModal.saveBtnDisabled]}
+              onPress={() => {
+                if (locationInput.trim()) { setCustomLocation(locationInput.trim()); setLocationModal(false); }
+              }}
+            >
+              <Text style={locModal.saveBtnText}>Save</Text>
+            </Pressable>
+            {isCustom && (
+              <Pressable style={locModal.gpsBtn} onPress={() => { resetToGPS(); setLocationModal(false); }}>
+                <Ionicons name="locate-outline" size={14} color={Colors.primary} />
+                <Text style={locModal.gpsBtnText}>Use GPS instead</Text>
+              </Pressable>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -307,77 +361,124 @@ const listStyles = StyleSheet.create({
   row: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: Colors.surface,
-    marginHorizontal: Spacing.md,
     borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: 'rgba(0,0,0,0.07)',
+    borderWidth: 1, borderColor: Colors.border,
     paddingHorizontal: Spacing.md, paddingVertical: Spacing.md,
-    gap: Spacing.md,
+    gap: Spacing.sm,
     ...Shadow.sm,
   },
   imgWrap: {
     width: 56, height: 56, borderRadius: Radius.md,
-    backgroundColor: '#F8F9FA',
     alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden', flexShrink: 0,
   },
   img: { width: 56, height: 56 },
   emoji: { fontSize: 28 },
   info: { flex: 1, gap: 2 },
-  te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted },
-  name: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textPrimary },
-  price: { fontFamily: FontFamily.numBold, fontSize: FontSize.sm, color: Colors.textPrimary },
-  unit: { fontFamily: FontFamily.num, fontSize: FontSize.xs, color: Colors.textMuted },
-  prev: { fontFamily: FontFamily.num, fontSize: FontSize.xs, color: Colors.textMuted, textDecorationLine: 'line-through' },
-  right: { alignItems: 'flex-end', gap: Spacing.xs },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  name: { fontFamily: FontFamily.semiBold, fontSize: FontSize.md, color: Colors.textPrimary },
+  te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted, marginTop: 1 },
+  price: { fontFamily: FontFamily.numBold, fontSize: FontSize.md, color: Colors.primaryAccent },
+  unit: { fontFamily: FontFamily.num, fontSize: FontSize.xs, color: Colors.primaryAccent },
+  heartBtn: { marginLeft: Spacing.sm },
+  shareBtn: {
+    marginLeft: Spacing.sm, width: 30, height: 30, borderRadius: Radius.full,
+    backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center',
+  },
 });
 
 const gridStyles = StyleSheet.create({
   card: {
     width: CARD_W, backgroundColor: Colors.surface,
     borderRadius: Radius.xl, borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.07)', overflow: 'hidden', ...Shadow.sm,
+    borderColor: Colors.border, overflow: 'hidden', ...Shadow.sm,
   },
-  imgBox: { width: CARD_W, height: IMG_H, backgroundColor: '#F8F9FA', position: 'relative' },
+  imgBox: { width: CARD_W, height: IMG_H, position: 'relative' },
   img: { width: '100%', height: '100%' },
   imgFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emoji: { fontSize: 52 },
   heartBtn: {
-    position: 'absolute', top: 6, right: 6,
-    width: 26, height: 26, borderRadius: 13,
+    position: 'absolute', top: 8, right: 8,
+    width: 28, height: 28, borderRadius: 14,
     backgroundColor: 'rgba(255,255,255,0.9)',
     alignItems: 'center', justifyContent: 'center',
   },
-  info: { padding: Spacing.sm, gap: 3 },
-  nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
-  name: { fontFamily: FontFamily.semiBold, fontSize: 13, color: Colors.textPrimary, flexShrink: 1 },
-  unit: { fontFamily: FontFamily.regular, fontSize: 11, color: Colors.textMuted },
-  te: { fontFamily: FontFamily.regular, fontSize: 11, color: Colors.textMuted },
-  footer:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  footerRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
-  price: { fontFamily: FontFamily.numBold, fontSize: FontSize.md, color: Colors.textPrimary },
-  prev: { fontFamily: FontFamily.num, fontSize: 10, color: Colors.textMuted, textDecorationLine: 'line-through' },
+  info: { padding: Spacing.md, gap: 2 },
+  name: { fontFamily: FontFamily.semiBold, fontSize: FontSize.md, color: Colors.textPrimary },
+  te: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textMuted },
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
+  price: { fontFamily: FontFamily.numBold, fontSize: FontSize.md, color: Colors.primaryAccent },
+  unit: { fontFamily: FontFamily.num, fontSize: FontSize.xs, color: Colors.primaryAccent },
+  shareBtn: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: Colors.primaryLight, alignItems: 'center', justifyContent: 'center',
+  },
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F2F3F5' },
-  header: { backgroundColor: '#206B3A', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.lg, borderBottomLeftRadius: Radius.xl, borderBottomRightRadius: Radius.xl, overflow: 'hidden' },
-  headerLightStrip: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '48%', backgroundColor: 'rgba(83,177,117,0.55)' } as any,
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.md },
-  title: { fontFamily: FontFamily.bold, fontSize: FontSize.xxxl, color: Colors.textInverse, letterSpacing: -0.5 },
-  telugu: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
-  date: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textInverse },
-  updated: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
-  searchRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
-  searchBar: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: Spacing.sm },
-  searchInput: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textPrimary, padding: 0, outlineStyle: 'none' } as any,
-  toggleBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, gap: 4, ...Shadow.sm },
-  toggleText: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.primaryDark },
-  chipsRow: { paddingVertical: Spacing.sm, backgroundColor: Colors.surface },
+  container: { flex: 1, backgroundColor: Colors.surface },
+
+  /* header — matches the home screen's header exactly */
+  header: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md, backgroundColor: Colors.surface },
+  headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  logo: { width: 116, height: 42 },
+  headerActions: { flexDirection: 'row', gap: Spacing.sm },
+  circleBtn: {
+    width: 38, height: 38, borderRadius: Radius.full,
+    backgroundColor: Colors.surfaceAlt, borderWidth: 1, borderColor: Colors.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  circleBtnActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  locRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
+  locText: { fontFamily: FontFamily.regular, fontSize: FontSize.xs, color: Colors.textSecondary, maxWidth: '78%' },
+
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.md },
+  search: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    backgroundColor: Colors.surfaceAlt, borderRadius: Radius.full,
+    borderWidth: 1, borderColor: Colors.border,
+    paddingHorizontal: Spacing.lg, height: 46,
+  },
+  searchInput: { flex: 1, fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textPrimary, padding: 0 },
+  toggleBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: Colors.primary, borderRadius: Radius.full,
+    paddingHorizontal: Spacing.lg, height: 46,
+  },
+  toggleText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.sm, color: Colors.textInverse },
+
+  /* title + date */
+  rateHead: { marginHorizontal: Spacing.lg, marginTop: Spacing.md, marginBottom: Spacing.md },
+  pageTitle: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary, letterSpacing: -0.3 },
+  dateLine: { fontFamily: FontFamily.medium, fontSize: FontSize.xs, color: Colors.primaryAccent, marginTop: 3 },
+
+  /* category chips */
+  chipsRow: { paddingBottom: Spacing.md, backgroundColor: Colors.surface },
   chipsContent: { paddingHorizontal: Spacing.lg, alignItems: 'center', gap: Spacing.sm },
-  tab: { borderRadius: Radius.full, paddingHorizontal: Spacing.lg, paddingVertical: 8, backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.border },
+  tab: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: 8,
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border,
+  },
   tabActive: { backgroundColor: Colors.primaryDark, borderColor: Colors.primaryDark },
+  tabIcon: { fontSize: 13 },
   tabLabel: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.textSecondary },
   tabLabelActive: { color: Colors.textInverse },
+});
+
+const locModal = StyleSheet.create({
+  overlay: { flex: 1, justifyContent: 'center' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: Colors.overlay },
+  sheet: { backgroundColor: Colors.surface, marginHorizontal: Spacing.xl, borderRadius: Radius.xl, padding: Spacing.xl, ...Shadow.lg },
+  title: { fontFamily: FontFamily.bold, fontSize: FontSize.lg, color: Colors.textPrimary },
+  sub: { fontFamily: FontFamily.regular, fontSize: FontSize.sm, color: Colors.textSecondary, marginTop: 4, marginBottom: Spacing.lg },
+  input: {
+    borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.md,
+    paddingHorizontal: Spacing.lg, paddingVertical: 12,
+    fontFamily: FontFamily.regular, fontSize: FontSize.md, color: Colors.textPrimary,
+  },
+  saveBtn: { backgroundColor: Colors.primary, borderRadius: Radius.md, paddingVertical: 13, alignItems: 'center', marginTop: Spacing.lg },
+  saveBtnDisabled: { opacity: 0.5 },
+  saveBtnText: { fontFamily: FontFamily.semiBold, fontSize: FontSize.md, color: Colors.textInverse },
+  gpsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: Spacing.md },
+  gpsBtnText: { fontFamily: FontFamily.medium, fontSize: FontSize.sm, color: Colors.primary },
 });
